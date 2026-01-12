@@ -45,6 +45,73 @@ She has outrun typhoons and carried tea from Canton in 79 days.
 
 *(Remove spaces in fence markers above - shown for display)*
 
+## Why Integrate Yurtle with RDFlib?
+
+Yurtle files are human-readable and LLM-friendly on their own. So why add RDFlib?
+
+### 1. **SPARQL Queries Across Your Entire Workspace**
+
+Without RDFlib, finding "all lab tests related to diabetes" means writing custom code to parse each file. With RDFlib:
+
+```python
+graph.query("""
+    SELECT ?test ?loinc WHERE {
+        ?test med:clinicalUse ?use .
+        FILTER(CONTAINS(?use, "diabetes"))
+    }
+""")
+```
+
+One query. Any complexity. Aggregations, joins, filters, graph traversal — all built-in.
+
+### 2. **Interoperability with Standard Vocabularies**
+
+RDFlib connects your Yurtle files to the wider semantic web:
+- **LOINC** for laboratory tests
+- **SNOMED-CT** for medical terminology
+- **Schema.org** for web content
+- **Dublin Core** for document metadata
+- Any RDF vocabulary you need
+
+### 3. **Bidirectional Sync: Files ↔ Graph**
+
+Edit files in your favorite editor (Obsidian, VSCode, vim) — the graph updates.
+Modify the graph programmatically — files update automatically.
+
+```python
+kb = create_live_graph("workspace/", auto_flush=True)
+kb.add((subject, predicate, object))  # File written immediately
+```
+
+### 4. **Provenance Tracking**
+
+Every triple knows where it came from:
+
+```python
+# Find which file defines a concept
+graph.query("""
+    SELECT ?file WHERE {
+        ?concept yurtle:title "Diabetes" .
+        ?concept prov:definedIn ?file .
+    }
+""")
+```
+
+### 5. **LLM + Structured Queries = Best of Both**
+
+- **LLMs** excel at understanding prose and answering open-ended questions
+- **SPARQL** excels at precise, repeatable, complex queries
+
+Use both: LLMs read the markdown content, SPARQL queries the structured data.
+
+### 6. **No Database Required**
+
+Your knowledge graph is just markdown files in a folder:
+- Version control with Git
+- Edit anywhere
+- No server to maintain
+- Works offline
+
 ## Installation
 
 ```bash
