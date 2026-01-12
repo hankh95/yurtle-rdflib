@@ -12,24 +12,38 @@ RDFlib plugin for [Yurtle format](https://github.com/hankh95/yurtle) - Markdown 
 Yurtle (YAML/RDF + Turtle) is a file format that combines:
 - **Markdown content** for human-readable documentation
 - **Turtle or YAML frontmatter** for machine-readable RDF triples
+- **Yurtle blocks** for inline structured data anywhere in the document
 
 This enables every `.md` file to be both a document AND a node in a knowledge graph.
 
 ```markdown
 ---
-@prefix yurtle: <https://yurtle.dev/schema/> .
-@prefix pm: <https://yurtle.dev/pm/> .
-
-<urn:task:F-048> a yurtle:WorkItem ;
-    pm:status "in-progress" ;
-    pm:priority 2 ;
-    yurtle:title "Production Hardening" .
+yurtle: v1.3
+id: nautical-project/ship
+type: asset
+title: Clipper Windchaser
+relates-to:
+  - nautical-project/voyage
+  - nautical-project/crew
+nugget: 1852 three-masted clipper - fastest trade-wind runner in the fleet
 ---
 
-# F-048: Production Hardening
+# Windchaser
 
-Human-readable content here...
+Built in Aberdeen, copper-sheathed, Baltimore clipper lines.
+
+` ` `yurtle
+ship:
+  name: Windchaser
+  built: 1852
+  length: 62m
+  captain: crew-captain-reed
+` ` `
+
+She has outrun typhoons and carried tea from Canton in 79 days.
 ```
+
+*(Remove spaces in fence markers above - shown for display)*
 
 ## Installation
 
@@ -178,49 +192,121 @@ graph.add((task, PM.status, Literal("completed")))
 
 ## Examples
 
-### Task Management System
+See the [examples/](examples/) directory for complete workspaces:
+
+- **[nautical-project/](examples/nautical-project/)** - Sailing voyage knowledge graph (from Yurtle spec)
+- **[lab-tests/](examples/lab-tests/)** - Medical laboratory tests with LOINC codes
+- **[QUERIES.md](examples/QUERIES.md)** - 20+ SPARQL query examples
+
+### Load the Nautical Project
+
+```python
+import yurtle_rdflib
+
+# Load the example workspace
+graph = yurtle_rdflib.load_workspace("examples/nautical-project/")
+
+# Find all crew members
+results = graph.query("""
+    PREFIX yurtle: <https://yurtle.dev/schema/>
+    SELECT ?person ?name ?role WHERE {
+        ?person yurtle:type "person" ;
+                yurtle:title ?name .
+        OPTIONAL { ?person yurtle:role ?role }
+    }
+""")
+
+for row in results:
+    print(f"{row.name}: {row.role or 'crew'}")
+```
+
+### Query Laboratory Tests
+
+```python
+import yurtle_rdflib
+
+# Load lab tests
+graph = yurtle_rdflib.load_workspace("examples/lab-tests/")
+
+# Find diabetes-related tests
+results = graph.query("""
+    PREFIX lab: <https://yurtle.dev/lab/>
+    PREFIX med: <https://yurtle.dev/medical/>
+    PREFIX yurtle: <https://yurtle.dev/schema/>
+
+    SELECT ?test ?title ?loinc WHERE {
+        ?test a lab:LaboratoryTest ;
+              yurtle:title ?title ;
+              lab:loincCode ?loinc ;
+              med:clinicalUse ?use .
+        FILTER(CONTAINS(LCASE(?use), "diabetes"))
+    }
+""")
+
+for row in results:
+    print(f"{row.title} (LOINC {row.loinc})")
+```
+
+### Advanced: Graph Traversal
+
+```python
+# Find all items related to the voyage (2 hops)
+results = graph.query("""
+    PREFIX yurtle: <https://yurtle.dev/schema/>
+
+    SELECT ?item ?title ?path WHERE {
+        ?voyage yurtle:title "Voyage to the Sapphire Isles" .
+        {
+            ?voyage yurtle:relatesTo ?item .
+            BIND("direct" as ?path)
+        }
+        UNION
+        {
+            ?voyage yurtle:relatesTo ?middle .
+            ?middle yurtle:relatesTo ?item .
+            BIND("via " + STR(?middle) as ?path)
+        }
+        ?item yurtle:title ?title .
+    }
+""")
+```
+
+### Advanced: Aggregation
+
+```python
+# Count documents by type
+results = graph.query("""
+    PREFIX yurtle: <https://yurtle.dev/schema/>
+
+    SELECT ?type (COUNT(?doc) as ?count) WHERE {
+        ?doc yurtle:type ?type .
+    }
+    GROUP BY ?type
+    ORDER BY DESC(?count)
+""")
+
+for row in results:
+    print(f"{row.type}: {row.count}")
+```
+
+### Live Sync with Filesystem
 
 ```python
 import yurtle_rdflib
 from rdflib import URIRef, Literal
 
-# Load all tasks
-graph = yurtle_rdflib.load_workspace("tasks/")
-
-# Find incomplete tasks
-results = graph.query("""
-    PREFIX pm: <https://yurtle.dev/pm/>
-    SELECT ?task ?title WHERE {
-        ?task pm:status "pending" ;
-              yurtle:title ?title .
-    }
-""")
-
-for row in results:
-    print(f"TODO: {row.title}")
-```
-
-### Knowledge Base
-
-```python
-import yurtle_rdflib
-
 # Create live-synced knowledge base
-kb = yurtle_rdflib.create_live_graph("knowledge/", auto_flush=True)
+kb = yurtle_rdflib.create_live_graph("my-workspace/", auto_flush=True)
 
-# Add knowledge (persists immediately)
+# Add knowledge (persists immediately to files)
 kb.add((
     URIRef("urn:concept:python"),
     yurtle_rdflib.KNOWLEDGE.relatedTo,
     URIRef("urn:concept:programming")
 ))
 
-# Query relationships
-results = kb.query("""
-    SELECT ?concept ?related WHERE {
-        ?concept knowledge:relatedTo ?related .
-    }
-""")
+# Changes in files sync back automatically
+kb.store.sync()
 ```
 
 ## Yurtle Format Specification
