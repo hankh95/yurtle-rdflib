@@ -200,6 +200,10 @@ class YurtleParser:
         text = path.read_text(encoding='utf-8')
         return self.parse(text, source_path=path)
 
+    # Heuristic patterns for detecting non-Turtle content in fenced blocks
+    _YAML_FIRST_LINE = re.compile(r'^[a-zA-Z_][\w-]*:\s*$')
+    _MERGE_CONFLICT = re.compile(r'^<{7}\s|^={7}\s*$|^>{7}\s', re.MULTILINE)
+
     def _parse_blocks(self, content: str, graph: Graph) -> None:
         """
         Extract and parse fenced turtle/yurtle blocks from markdown body.
@@ -207,6 +211,13 @@ class YurtleParser:
         Handles both ```turtle and ```yurtle fenced code blocks.
         Each block's Turtle content is parsed and merged into the
         document's graph. Malformed blocks are skipped with a warning.
+
+        Prefix inheritance: blocks automatically inherit all namespace
+        bindings from the document's graph (standard prefixes plus any
+        declared in Turtle frontmatter).
+
+        Robustness: blocks that look like YAML or contain git merge
+        conflict markers are silently skipped.
 
         Note: CommonMark info strings (e.g. ```turtle linenos) are
         intentionally not matched — only bare language tags with optional
@@ -217,16 +228,81 @@ class YurtleParser:
         parse will double-count those triples. Consumers should be aware of
         this when doing write+reparse cycles.
         """
+        # Build @prefix header from graph's namespace bindings so fenced
+        # blocks inherit the document's prefix context.
+        prefix_header = self._build_prefix_header(graph)
+
         for match in self.FENCED_BLOCK_PATTERN.finditer(content):
             block_content = match.group(1).strip()
             if not block_content:
                 continue
+
+            # Skip blocks that look like YAML, not Turtle
+            if self._looks_like_yaml(block_content):
+                self.logger.debug(
+                    "Skipping non-Turtle content in fenced block "
+                    f"at offset {match.start()}"
+                )
+                continue
+
+            # Skip blocks with git merge conflict markers
+            if self._MERGE_CONFLICT.search(block_content):
+                self.logger.debug(
+                    "Skipping fenced block with merge conflict markers "
+                    f"at offset {match.start()}"
+                )
+                continue
+
             try:
-                graph.parse(data=block_content, format='turtle')
+                # Prepend prefix declarations so blocks inherit document
+                # namespace context.  Any @prefix in the block itself will
+                # override the injected ones (last declaration wins).
+                enriched = prefix_header + block_content
+                graph.parse(data=enriched, format='turtle')
             except Exception as e:
-                self.logger.warning(
+                self.logger.debug(
                     f"Failed to parse fenced block at offset {match.start()}: {e}"
                 )
+
+    @staticmethod
+    def _build_prefix_header(graph: Graph) -> str:
+        """Build @prefix declarations from the graph's namespace bindings.
+
+        Returns a string of @prefix lines that can be prepended to fenced
+        block content, allowing blocks to use any prefix declared in the
+        document's frontmatter or in the standard set.
+        """
+        lines = []
+        for prefix, ns in sorted(graph.namespace_manager.namespaces()):
+            if prefix:  # Skip default (empty) namespace
+                lines.append(f"@prefix {prefix}: <{ns}> .")
+        return "\n".join(lines) + "\n\n" if lines else ""
+
+    @classmethod
+    def _looks_like_yaml(cls, content: str) -> bool:
+        """Heuristic: detect content that looks like YAML rather than Turtle.
+
+        Checks the first non-empty, non-comment line for YAML patterns:
+        - ``---`` (YAML document start marker)
+        - ``key:`` at end of line (YAML block mapping key)
+
+        These patterns don't occur in valid Turtle, so false positives
+        are unlikely.
+        """
+        for line in content.split('\n'):
+            line = line.strip()
+            if not line or line.startswith('#'):
+                continue
+            # YAML document start
+            if line == '---':
+                return True
+            # YAML block mapping key: "key:" at end of line
+            # In Turtle, "prefix:" is always followed by a local name
+            if cls._YAML_FIRST_LINE.match(line):
+                return True
+            # First real line found — not YAML-like
+            return False
+        return False
 
     def _is_turtle(self, frontmatter: str) -> bool:
         """Check if frontmatter is Turtle format."""

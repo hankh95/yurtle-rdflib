@@ -281,8 +281,8 @@ Content continues.
         # Should not crash — malformed block skipped
         assert doc.frontmatter_type == "yaml"
 
-    def test_malformed_block_logs_warning_with_offset(self, caplog):
-        """Malformed block should log a warning including the block offset."""
+    def test_malformed_block_logs_debug_with_offset(self, caplog):
+        """Malformed block should log at DEBUG including the block offset."""
         import logging
         text = '''---
 id: test
@@ -296,7 +296,7 @@ not valid turtle!!!
 ```
 '''
         parser = YurtleParser()
-        with caplog.at_level(logging.WARNING, logger="yurtle-parser"):
+        with caplog.at_level(logging.DEBUG, logger="yurtle-parser"):
             doc = parser.parse(text)
         assert any("offset" in record.message for record in caplog.records)
 
@@ -446,3 +446,207 @@ title: Test
         hyp = Namespace("https://nusy.dev/hypothesis/")
         papers = list(graph.objects(predicate=hyp.paper))
         assert len(papers) >= 1
+
+    def test_prefix_inheritance_from_standard(self):
+        """Fenced blocks should inherit standard prefixes without redeclaring."""
+        text = '''---
+id: test
+title: Test
+---
+
+# Test
+
+```turtle
+<#item> rdfs:label "Inherited prefix" .
+```
+'''
+        parser = YurtleParser()
+        doc = parser.parse(text)
+
+        from rdflib.namespace import RDFS
+        labels = [str(label) for label in doc.graph.objects(predicate=RDFS.label)]
+        assert "Inherited prefix" in labels
+
+    def test_prefix_inheritance_from_frontmatter(self):
+        """Fenced blocks should inherit prefixes declared in Turtle frontmatter."""
+        text = '''---
+@prefix yurtle: <https://yurtle.dev/schema/> .
+@prefix custom: <https://example.org/custom/> .
+
+<urn:doc:test> a yurtle:WorkItem ;
+    yurtle:title "Test" .
+---
+
+# Test
+
+```turtle
+<#item> custom:property "Frontmatter prefix" .
+```
+'''
+        parser = YurtleParser()
+        doc = parser.parse(text)
+
+        custom = Namespace("https://example.org/custom/")
+        values = [str(o) for o in doc.graph.objects(predicate=custom.property)]
+        assert "Frontmatter prefix" in values
+
+    def test_block_prefix_overrides_injected(self):
+        """Block's own @prefix should override injected declarations."""
+        text = '''---
+@prefix yurtle: <https://yurtle.dev/schema/> .
+@prefix custom: <https://example.org/custom/> .
+
+<urn:doc:test> a yurtle:WorkItem .
+---
+
+# Test
+
+```turtle
+@prefix custom: <https://example.org/override/> .
+
+<#item> custom:property "Override test" .
+```
+'''
+        parser = YurtleParser()
+        doc = parser.parse(text)
+
+        # The block's @prefix should take precedence
+        override = Namespace("https://example.org/override/")
+        values = [str(o) for o in doc.graph.objects(predicate=override.property)]
+        assert "Override test" in values
+
+    def test_yaml_in_yurtle_block_skipped(self):
+        """YAML content in a ```yurtle block should be silently skipped."""
+        text = '''---
+id: test
+title: Test
+---
+
+# Test
+
+```yurtle
+being:
+  id: santiago-developer-v7
+  name: "Santiago Developer"
+```
+
+Content continues.
+'''
+        parser = YurtleParser()
+        doc = parser.parse(text)
+        # Should not crash, only frontmatter triples
+        assert doc.frontmatter_type == "yaml"
+        # Graph should have frontmatter triples but not crash on YAML block
+        assert len(doc.graph) >= 1
+
+    def test_yaml_in_turtle_block_skipped(self):
+        """YAML content in a ```turtle block should be silently skipped."""
+        text = '''---
+id: test
+title: Test
+---
+
+# Test
+
+```turtle
+corpus:
+  # Phase 1: Foundation
+  - name: core-docs
+    path: /data/corpus
+```
+'''
+        parser = YurtleParser()
+        doc = parser.parse(text)
+        assert doc.frontmatter_type == "yaml"
+
+    def test_yaml_with_document_start_in_block_skipped(self):
+        """YAML with --- document start marker in fenced block should be skipped."""
+        text = '''---
+id: test
+title: Test
+---
+
+# Test
+
+```yurtle
+# knowledge_index.md
+---
+being: santiago-highschool-v11
+last_updated: 2026-02-14
+y1_concepts: 847
+---
+```
+'''
+        parser = YurtleParser()
+        doc = parser.parse(text)
+        assert doc.frontmatter_type == "yaml"
+
+    def test_merge_conflict_in_block_skipped(self):
+        """Fenced blocks with git merge conflict markers should be skipped."""
+        text = '''---
+id: test
+title: Test
+---
+
+# Test
+
+```turtle
+@prefix kb: <https://yurtle.dev/kanban/> .
+
+<> kb:status kb:done ;
+<<<<<<< HEAD
+    kb:forcedMove "true"^^xsd:boolean ;
+=======
+>>>>>>> 8a6d7c07
+```
+'''
+        parser = YurtleParser()
+        doc = parser.parse(text)
+        # Should not crash — conflict block skipped
+        assert doc.frontmatter_type == "yaml"
+
+    def test_yaml_detection_does_not_flag_turtle(self):
+        """Valid Turtle content should NOT be detected as YAML."""
+        # These patterns look vaguely YAML-ish but are valid Turtle
+        assert not YurtleParser._looks_like_yaml(
+            '<#item> rdfs:label "Test" .'
+        )
+        assert not YurtleParser._looks_like_yaml(
+            '@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .\n'
+            '<#item> rdfs:label "Test" .'
+        )
+        assert not YurtleParser._looks_like_yaml(
+            '# A comment line\n'
+            '<#item> rdfs:label "Test" .'
+        )
+
+    def test_yaml_detection_catches_yaml(self):
+        """YAML-like content should be correctly detected."""
+        assert YurtleParser._looks_like_yaml('being:\n  id: foo')
+        assert YurtleParser._looks_like_yaml('corpus:\n  - name: x')
+        assert YurtleParser._looks_like_yaml('# comment\n---\nkey: val')
+        assert YurtleParser._looks_like_yaml('scenarios:\n  - id: s1')
+
+    def test_malformed_block_logs_debug_not_warning(self, caplog):
+        """Unparseable fenced blocks should log at DEBUG, not WARNING."""
+        import logging
+        text = '''---
+id: test
+title: Test
+---
+
+# Test
+
+```turtle
+<> a unknown:Type .
+```
+'''
+        parser = YurtleParser()
+        with caplog.at_level(logging.DEBUG, logger="yurtle-parser"):
+            doc = parser.parse(text)
+
+        # Should be logged at DEBUG level, not WARNING
+        parse_msgs = [r for r in caplog.records if "Failed to parse" in r.message]
+        assert len(parse_msgs) >= 1
+        for msg in parse_msgs:
+            assert msg.levelno == logging.DEBUG
