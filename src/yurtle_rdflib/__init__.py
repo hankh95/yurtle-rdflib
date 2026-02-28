@@ -68,7 +68,7 @@ from .namespaces import (
 logger = logging.getLogger(__name__)
 
 # Version info
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 __all__ = [
     # Version
     "__version__",

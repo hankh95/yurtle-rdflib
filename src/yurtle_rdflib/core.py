@@ -121,6 +121,14 @@ class YurtleParser:
         re.DOTALL
     )
 
+    # Regex to extract fenced turtle/yurtle blocks from markdown body.
+    # Handles: trailing spaces after language tag, CRLF line endings,
+    # and line-anchored closing fence (CommonMark compliance).
+    FENCED_BLOCK_PATTERN = re.compile(
+        r'```(?:turtle|yurtle)\s*\r?\n(.*?)^```',
+        re.DOTALL | re.MULTILINE
+    )
+
     # Standard namespace prefixes
     STANDARD_PREFIXES = {
         'yurtle': YURTLE,
@@ -150,9 +158,13 @@ class YurtleParser:
         match = self.FRONTMATTER_PATTERN.match(text)
 
         if not match:
-            # No frontmatter
+            # No frontmatter — still parse fenced blocks from body
+            graph = Graph()
+            for prefix, ns in self.STANDARD_PREFIXES.items():
+                graph.bind(prefix, ns)
+            self._parse_blocks(text, graph)
             return YurtleDocument(
-                graph=Graph(),
+                graph=graph,
                 content=text,
                 frontmatter_raw="",
                 frontmatter_type="none",
@@ -170,6 +182,9 @@ class YurtleParser:
             graph, subject_uri = self._parse_yaml(frontmatter_raw, source_path)
             frontmatter_type = "yaml"
 
+        # Parse fenced turtle/yurtle blocks from markdown body
+        self._parse_blocks(content, graph)
+
         return YurtleDocument(
             graph=graph,
             content=content,
@@ -184,6 +199,34 @@ class YurtleParser:
         path = Path(path)
         text = path.read_text(encoding='utf-8')
         return self.parse(text, source_path=path)
+
+    def _parse_blocks(self, content: str, graph: Graph) -> None:
+        """
+        Extract and parse fenced turtle/yurtle blocks from markdown body.
+
+        Handles both ```turtle and ```yurtle fenced code blocks.
+        Each block's Turtle content is parsed and merged into the
+        document's graph. Malformed blocks are skipped with a warning.
+
+        Note: CommonMark info strings (e.g. ```turtle linenos) are
+        intentionally not matched — only bare language tags with optional
+        trailing whitespace are supported.
+
+        Warning: Round-trip duplication — YurtleWriter serializes all triples
+        into frontmatter while fenced blocks remain in body text. A subsequent
+        parse will double-count those triples. Consumers should be aware of
+        this when doing write+reparse cycles.
+        """
+        for match in self.FENCED_BLOCK_PATTERN.finditer(content):
+            block_content = match.group(1).strip()
+            if not block_content:
+                continue
+            try:
+                graph.parse(data=block_content, format='turtle')
+            except Exception as e:
+                self.logger.warning(
+                    f"Failed to parse fenced block at offset {match.start()}: {e}"
+                )
 
     def _is_turtle(self, frontmatter: str) -> bool:
         """Check if frontmatter is Turtle format."""
