@@ -207,6 +207,15 @@ class YurtleParser:
         Handles both ```turtle and ```yurtle fenced code blocks.
         Each block's Turtle content is parsed and merged into the
         document's graph. Malformed blocks are skipped with a warning.
+
+        Note: CommonMark info strings (e.g. ```turtle linenos) are
+        intentionally not matched — only bare language tags with optional
+        trailing whitespace are supported.
+
+        Warning: Round-trip duplication — YurtleWriter serializes all triples
+        into frontmatter while fenced blocks remain in body text. A subsequent
+        parse will double-count those triples. Consumers should be aware of
+        this when doing write+reparse cycles.
         """
         for match in self.FENCED_BLOCK_PATTERN.finditer(content):
             block_content = match.group(1).strip()

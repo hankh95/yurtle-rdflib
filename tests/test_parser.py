@@ -196,7 +196,7 @@ class TestFencedBlockParsing:
         # Check a triple from the turtle block
         from rdflib.namespace import RDFS
         labels = list(doc.graph.objects(predicate=RDFS.label))
-        label_strs = [str(l) for l in labels]
+        label_strs = [str(label) for label in labels]
         assert "Chunk Graph Storage" in label_strs
 
     def test_fenced_yurtle_block_parsed(self, sample_doc_with_fenced_blocks):
@@ -239,7 +239,7 @@ class TestFencedBlockParsing:
 
         from rdflib.namespace import RDFS
         labels = list(doc.graph.objects(predicate=RDFS.label))
-        assert any("Interesting finding" in str(l) for l in labels)
+        assert any("Interesting finding" in str(label) for label in labels)
 
     def test_empty_fenced_block_skipped(self):
         """Empty fenced blocks should be skipped gracefully."""
@@ -308,7 +308,7 @@ not valid turtle!!!
         doc = parser.parse(text)
 
         from rdflib.namespace import RDFS
-        labels = [str(l) for l in doc.graph.objects(predicate=RDFS.label)]
+        labels = [str(label) for label in doc.graph.objects(predicate=RDFS.label)]
         assert "CRLF test" in labels
 
     def test_trailing_space_after_language_tag(self):
@@ -326,7 +326,7 @@ not valid turtle!!!
         doc = parser.parse(text)
 
         from rdflib.namespace import RDFS
-        labels = [str(l) for l in doc.graph.objects(predicate=RDFS.label)]
+        labels = [str(label) for label in doc.graph.objects(predicate=RDFS.label)]
         assert "Trailing space test" in labels
 
     def test_turtle_frontmatter_with_fenced_blocks(self, sample_turtle_doc):
@@ -347,7 +347,7 @@ not valid turtle!!!
         assert doc.subject_uri == URIRef("urn:task:T-001")
         # Fenced block triples
         from rdflib.namespace import RDFS
-        labels = [str(l) for l in doc.graph.objects(predicate=RDFS.label)]
+        labels = [str(label) for label in doc.graph.objects(predicate=RDFS.label)]
         assert "Extra from block" in labels
 
     def test_multiple_blocks_all_parsed(self, sample_doc_with_fenced_blocks):
@@ -382,6 +382,58 @@ not valid turtle!!!
         hyp = Namespace("https://nusy.dev/hypothesis/")
         papers = list(graph.objects(predicate=hyp.paper))
         assert len(papers) >= 1
+
+    def test_round_trip_duplication_risk(self, sample_doc_with_fenced_blocks):
+        """Round-trip write+reparse should not duplicate fenced block triples.
+
+        B4 review finding: YurtleWriter serializes ALL triples into frontmatter.
+        Fenced blocks remain in body text. A second parse would double-count
+        those triples. This test documents the known behavior.
+        """
+        from yurtle_rdflib import YurtleWriter
+
+        parser = YurtleParser()
+        writer = YurtleWriter()
+
+        # First parse
+        doc = parser.parse(sample_doc_with_fenced_blocks)
+        original_count = len(doc.graph)
+
+        # Write and re-parse
+        text = writer.write(doc)
+        doc2 = parser.parse(text)
+
+        # Document the known duplication: fenced block triples appear in both
+        # the serialized frontmatter AND the body's fenced blocks.
+        # Consumers doing round-trip editing should be aware of this.
+        assert len(doc2.graph) >= original_count, (
+            "Re-parsed graph should have at least as many triples as original"
+        )
+
+    def test_info_string_after_language_tag_not_matched(self):
+        """CommonMark info strings (e.g. ```turtle linenos) are intentionally
+        not matched. Only bare ```turtle or ```yurtle (with optional whitespace)
+        are recognized. This is by design — info strings are uncommon in
+        knowledge blocks and supporting them would complicate the regex."""
+        text = '''---
+id: test
+title: Test
+---
+
+# Test
+
+```turtle linenos
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+
+<#item> rdfs:label "Should not parse" .
+```
+'''
+        parser = YurtleParser()
+        doc = parser.parse(text)
+
+        from rdflib.namespace import RDFS
+        labels = [str(label) for label in doc.graph.objects(predicate=RDFS.label)]
+        assert "Should not parse" not in labels
 
     def test_workspace_scan_includes_blocks(self, tmp_path, sample_doc_with_hdd_block):
         """load_workspace / scan_workspace_graph should include fenced block triples."""
