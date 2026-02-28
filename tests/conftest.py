@@ -131,6 +131,98 @@ A project file.
 
 
 @pytest.fixture
+def sample_doc_with_fenced_blocks():
+    """Sample Yurtle document with YAML frontmatter and fenced turtle blocks."""
+    return '''---
+id: EXP-981
+title: "Y0/Y1 Chunk Graph Storage"
+type: expedition
+status: done
+tags: [ylayer, knowledge]
+---
+
+# EXP-981: Y0/Y1 Chunk Graph Storage
+
+Implementation of chunk-level graph storage for Y0/Y1 layers.
+
+```turtle
+@prefix ylayer: <https://nusy.dev/ylayer/> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+
+<#chunk-storage> a ylayer:Feature ;
+    rdfs:label "Chunk Graph Storage" ;
+    ylayer:layer "Y0", "Y1" .
+```
+
+## Results
+
+The feature was implemented successfully.
+
+```yurtle
+@prefix kb: <https://yurtle.dev/kanban/> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<> kb:statusChange [
+    kb:status kb:done ;
+    kb:at "2026-02-25T23:46:48"^^xsd:dateTime ;
+    kb:by "DGX" ;
+  ] .
+```
+'''
+
+
+@pytest.fixture
+def sample_doc_with_hdd_block():
+    """Sample HDD hypothesis file with turtle knowledge block."""
+    return '''---
+id: H130.1
+title: "V12 accuracy improves"
+type: hypothesis
+status: draft
+paper: PAPER-130
+target: ">=85%"
+tags: [paper-130]
+---
+
+# H130.1: V12 accuracy improves
+
+```turtle
+@prefix hyp: <https://nusy.dev/hypothesis/> .
+@prefix paper: <https://nusy.dev/paper/> .
+@prefix measure: <https://nusy.dev/measure/> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+
+<#H130.1> a hyp:Hypothesis ;
+    rdfs:label "V12 accuracy improves" ;
+    hyp:paper paper:PAPER-130 ;
+    hyp:target ">=85%" ;
+    hyp:measuredBy measure:M-007, measure:M-025 .
+```
+
+## Rationale
+
+We hypothesize that V12's cognitive signal fusion improves accuracy.
+'''
+
+
+@pytest.fixture
+def sample_doc_no_frontmatter_with_block():
+    """Document with no frontmatter but a fenced turtle block."""
+    return '''# Standalone Notes
+
+Some notes with an inline knowledge block.
+
+```turtle
+@prefix note: <https://nusy.dev/note/> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+
+<#observation-1> a note:Observation ;
+    rdfs:label "Interesting finding" .
+```
+'''
+
+
+@pytest.fixture
 def empty_graph():
     """Return an empty RDFlib Graph."""
     return Graph()

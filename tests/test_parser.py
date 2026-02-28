@@ -4,7 +4,7 @@ Tests for the Yurtle parser.
 
 import pytest
 from pathlib import Path
-from rdflib import Graph, URIRef, Literal
+from rdflib import Graph, URIRef, Literal, Namespace
 
 import yurtle_rdflib
 from yurtle_rdflib import YurtleParser, YurtleDocument, YURTLE, PM
@@ -173,3 +173,155 @@ class TestConvenienceFunctions:
 
         assert isinstance(graph, Graph)
         assert len(graph) >= 4
+
+
+class TestFencedBlockParsing:
+    """Tests for parsing fenced ```turtle and ```yurtle blocks in markdown body."""
+
+    def test_fenced_turtle_block_parsed(self, sample_doc_with_fenced_blocks):
+        """Fenced ```turtle blocks should be parsed into the graph."""
+        parser = YurtleParser()
+        doc = parser.parse(sample_doc_with_fenced_blocks)
+
+        # Frontmatter triples should exist (YAML-based)
+        assert doc.frontmatter_type == "yaml"
+        assert len(doc.graph) > 0
+
+        # Fenced turtle block triples should also be in the graph
+        ylayer = Namespace("https://nusy.dev/ylayer/")
+        subjects = [str(s) for s in doc.graph.subjects()]
+        # The <#chunk-storage> subject from the turtle block
+        assert any("chunk-storage" in s for s in subjects)
+
+        # Check a triple from the turtle block
+        from rdflib.namespace import RDFS
+        labels = list(doc.graph.objects(predicate=RDFS.label))
+        label_strs = [str(l) for l in labels]
+        assert "Chunk Graph Storage" in label_strs
+
+    def test_fenced_yurtle_block_parsed(self, sample_doc_with_fenced_blocks):
+        """Fenced ```yurtle blocks should also be parsed."""
+        parser = YurtleParser()
+        doc = parser.parse(sample_doc_with_fenced_blocks)
+
+        # The ```yurtle block has kb:statusChange triples
+        kb = Namespace("https://yurtle.dev/kanban/")
+        status_changes = list(doc.graph.triples((None, kb.statusChange, None)))
+        assert len(status_changes) >= 1
+
+    def test_hdd_knowledge_block(self, sample_doc_with_hdd_block):
+        """HDD hypothesis knowledge block should produce queryable triples."""
+        parser = YurtleParser()
+        doc = parser.parse(sample_doc_with_hdd_block)
+
+        hyp = Namespace("https://nusy.dev/hypothesis/")
+        paper = Namespace("https://nusy.dev/paper/")
+        measure = Namespace("https://nusy.dev/measure/")
+
+        # Check hyp:paper predicate
+        papers = list(doc.graph.objects(predicate=hyp.paper))
+        assert paper["PAPER-130"] in papers
+
+        # Check hyp:measuredBy (should have 2 measures)
+        measures = list(doc.graph.objects(predicate=hyp.measuredBy))
+        assert len(measures) == 2
+        assert measure["M-007"] in measures
+        assert measure["M-025"] in measures
+
+    def test_no_frontmatter_with_block(self, sample_doc_no_frontmatter_with_block):
+        """Documents with no frontmatter should still parse fenced blocks."""
+        parser = YurtleParser()
+        doc = parser.parse(sample_doc_no_frontmatter_with_block)
+
+        assert doc.frontmatter_type == "none"
+        # But the graph should have triples from the fenced block
+        assert len(doc.graph) > 0
+
+        from rdflib.namespace import RDFS
+        labels = list(doc.graph.objects(predicate=RDFS.label))
+        assert any("Interesting finding" in str(l) for l in labels)
+
+    def test_empty_fenced_block_skipped(self):
+        """Empty fenced blocks should be skipped gracefully."""
+        text = '''---
+id: test
+title: Test
+---
+
+# Test
+
+```turtle
+```
+
+Content continues.
+'''
+        parser = YurtleParser()
+        doc = parser.parse(text)
+        # Should not crash, graph has only frontmatter triples
+        assert doc.frontmatter_type == "yaml"
+
+    def test_malformed_fenced_block_skipped(self):
+        """Malformed turtle in fenced blocks should be skipped with warning."""
+        text = '''---
+id: test
+title: Test
+---
+
+# Test
+
+```turtle
+This is not valid turtle at all!!!
+@prefix broken
+```
+
+Content continues.
+'''
+        parser = YurtleParser()
+        doc = parser.parse(text)
+        # Should not crash — malformed block skipped
+        assert doc.frontmatter_type == "yaml"
+
+    def test_multiple_blocks_all_parsed(self, sample_doc_with_fenced_blocks):
+        """Multiple fenced blocks in one document should all be parsed."""
+        parser = YurtleParser()
+        doc = parser.parse(sample_doc_with_fenced_blocks)
+
+        # Should have triples from YAML frontmatter + turtle block + yurtle block
+        # YAML: id, title, type, status, tags (at least 5)
+        # turtle: chunk-storage type, label, layer (at least 3)
+        # yurtle: statusChange blank node (at least 1)
+        assert len(doc.graph) >= 9
+
+    def test_content_preserved_with_blocks(self, sample_doc_with_hdd_block):
+        """Markdown content including fenced blocks should be preserved."""
+        parser = YurtleParser()
+        doc = parser.parse(sample_doc_with_hdd_block)
+
+        # Content should still contain the fenced block text
+        assert "```turtle" in doc.content
+        assert "hyp:paper paper:PAPER-130" in doc.content
+        assert "## Rationale" in doc.content
+
+    def test_graph_parse_with_fenced_blocks(self, tmp_path, sample_doc_with_hdd_block):
+        """Graph.parse(format='yurtle') should include fenced block triples."""
+        file_path = tmp_path / "hypothesis.md"
+        file_path.write_text(sample_doc_with_hdd_block)
+
+        graph = Graph()
+        graph.parse(str(file_path), format="yurtle")
+
+        hyp = Namespace("https://nusy.dev/hypothesis/")
+        papers = list(graph.objects(predicate=hyp.paper))
+        assert len(papers) >= 1
+
+    def test_workspace_scan_includes_blocks(self, tmp_path, sample_doc_with_hdd_block):
+        """load_workspace / scan_workspace_graph should include fenced block triples."""
+        workspace = tmp_path / "research"
+        workspace.mkdir()
+        (workspace / "H130.1.md").write_text(sample_doc_with_hdd_block)
+
+        graph = yurtle_rdflib.scan_workspace_graph(workspace)
+
+        hyp = Namespace("https://nusy.dev/hypothesis/")
+        papers = list(graph.objects(predicate=hyp.paper))
+        assert len(papers) >= 1
