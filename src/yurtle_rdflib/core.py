@@ -121,10 +121,12 @@ class YurtleParser:
         re.DOTALL
     )
 
-    # Regex to extract fenced turtle/yurtle blocks from markdown body
+    # Regex to extract fenced turtle/yurtle blocks from markdown body.
+    # Handles: trailing spaces after language tag, CRLF line endings,
+    # and line-anchored closing fence (CommonMark compliance).
     FENCED_BLOCK_PATTERN = re.compile(
-        r'```(?:turtle|yurtle)\n(.*?)```',
-        re.DOTALL
+        r'```(?:turtle|yurtle)\s*\r?\n(.*?)^```',
+        re.DOTALL | re.MULTILINE
     )
 
     # Standard namespace prefixes
@@ -213,7 +215,9 @@ class YurtleParser:
             try:
                 graph.parse(data=block_content, format='turtle')
             except Exception as e:
-                self.logger.warning(f"Failed to parse fenced block: {e}")
+                self.logger.warning(
+                    f"Failed to parse fenced block at offset {match.start()}: {e}"
+                )
 
     def _is_turtle(self, frontmatter: str) -> bool:
         """Check if frontmatter is Turtle format."""

@@ -281,6 +281,75 @@ Content continues.
         # Should not crash — malformed block skipped
         assert doc.frontmatter_type == "yaml"
 
+    def test_malformed_block_logs_warning_with_offset(self, caplog):
+        """Malformed block should log a warning including the block offset."""
+        import logging
+        text = '''---
+id: test
+title: Test
+---
+
+# Test
+
+```turtle
+not valid turtle!!!
+```
+'''
+        parser = YurtleParser()
+        with caplog.at_level(logging.WARNING, logger="yurtle-parser"):
+            doc = parser.parse(text)
+        assert any("offset" in record.message for record in caplog.records)
+
+    def test_crlf_line_endings(self):
+        """Fenced blocks with CRLF line endings should be parsed."""
+        # Build content with CRLF endings
+        text = "---\r\nid: test\r\ntitle: Test\r\n---\r\n\r\n# Test\r\n\r\n```turtle\r\n@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .\r\n\r\n<#item> rdfs:label \"CRLF test\" .\r\n```\r\n"
+        parser = YurtleParser()
+        doc = parser.parse(text)
+
+        from rdflib.namespace import RDFS
+        labels = [str(l) for l in doc.graph.objects(predicate=RDFS.label)]
+        assert "CRLF test" in labels
+
+    def test_trailing_space_after_language_tag(self):
+        """Fenced blocks with trailing spaces after language tag should parse."""
+        # Explicit string construction to guarantee trailing spaces after 'turtle'
+        text = (
+            "---\nid: test\ntitle: Test\n---\n\n# Test\n\n"
+            "```turtle   \n"  # <-- trailing spaces before newline
+            '@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .\n'
+            '\n'
+            '<#item> rdfs:label "Trailing space test" .\n'
+            "```\n"
+        )
+        parser = YurtleParser()
+        doc = parser.parse(text)
+
+        from rdflib.namespace import RDFS
+        labels = [str(l) for l in doc.graph.objects(predicate=RDFS.label)]
+        assert "Trailing space test" in labels
+
+    def test_turtle_frontmatter_with_fenced_blocks(self, sample_turtle_doc):
+        """Turtle frontmatter + fenced blocks should both parse into graph."""
+        # Append a fenced block to the turtle-frontmatter doc
+        text = sample_turtle_doc + '''
+```turtle
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+
+<#extra> rdfs:label "Extra from block" .
+```
+'''
+        parser = YurtleParser()
+        doc = parser.parse(text)
+
+        assert doc.frontmatter_type == "turtle"
+        # Frontmatter triples (T-001 work item)
+        assert doc.subject_uri == URIRef("urn:task:T-001")
+        # Fenced block triples
+        from rdflib.namespace import RDFS
+        labels = [str(l) for l in doc.graph.objects(predicate=RDFS.label)]
+        assert "Extra from block" in labels
+
     def test_multiple_blocks_all_parsed(self, sample_doc_with_fenced_blocks):
         """Multiple fenced blocks in one document should all be parsed."""
         parser = YurtleParser()
