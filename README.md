@@ -423,6 +423,26 @@ black src tests
 ruff check src tests
 ```
 
+## Changelog
+
+### v0.2.0 (2026-03-01)
+
+**Fenced block parsing and robustness.**
+
+#### Added
+- **Fenced turtle/yurtle block parsing** — Parse ` ```turtle ` and ` ```yurtle ` fenced blocks within Yurtle markdown files. Triples from fenced blocks are merged into the same graph as frontmatter triples (EXP-1024)
+
+#### Fixed
+- **Prefix inheritance** — Fenced blocks inherit `@prefix` declarations from the YAML/Turtle frontmatter, eliminating "Prefix not bound" warnings (PR #3)
+- **YAML frontmatter skip** — Parser correctly skips pure YAML frontmatter (no Turtle) without emitting parse errors
+- **Git conflict marker skip** — Files containing `<<<<<<<` merge conflict markers are silently skipped instead of crashing
+
+### v0.1.0 (2026-02-22)
+
+- Initial release: RDFlib plugin for parsing and serializing Yurtle files
+- SPARQL-queryable graphs from Yurtle markdown with Turtle frontmatter
+- Registered as `yurtle` format with RDFlib's plugin system
+
 ## Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
@@ -434,4 +454,5 @@ MIT License - see [LICENSE](LICENSE) for details.
 ## Related Projects
 
 - [Yurtle Specification](https://github.com/hankh95/yurtle) - The Yurtle format spec
+- [Yurtle Kanban](https://github.com/hankh95/yurtle-kanban) - File-based kanban on git
 - [RDFlib](https://github.com/RDFLib/rdflib) - Python RDF library
