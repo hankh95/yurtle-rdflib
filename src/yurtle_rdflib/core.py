@@ -129,6 +129,20 @@ class YurtleParser:
         re.DOTALL | re.MULTILINE
     )
 
+    # Regex to extract fenced yurtle-table blocks from markdown body.
+    FENCED_TABLE_PATTERN = re.compile(
+        r'```yurtle-table\s*\r?\n(.*?)^```',
+        re.DOTALL | re.MULTILINE
+    )
+
+    # Patterns for yurtle-table directive parsing
+    _TABLE_TYPE_DIRECTIVE = re.compile(r'^@type\s+(.+?)\s*$', re.MULTILINE)
+    _TABLE_PREFIX_DECL = re.compile(
+        r'^@prefix\s+(\w*):\s*<([^>]+)>\s*\.\s*$', re.MULTILINE
+    )
+    _TABLE_SEPARATOR = re.compile(r'^\|[\s:]*-+[\s:|-]*\|$')
+    _DATE_PATTERN = re.compile(r'^\d{4}-\d{2}-\d{2}$')
+
     # Standard namespace prefixes
     STANDARD_PREFIXES = {
         'yurtle': YURTLE,
@@ -182,7 +196,7 @@ class YurtleParser:
             graph, subject_uri = self._parse_yaml(frontmatter_raw, source_path)
             frontmatter_type = "yaml"
 
-        # Parse fenced turtle/yurtle blocks from markdown body
+        # Parse fenced turtle/yurtle blocks and yurtle-table blocks
         self._parse_blocks(content, graph)
 
         return YurtleDocument(
@@ -263,6 +277,197 @@ class YurtleParser:
                 self.logger.debug(
                     f"Failed to parse fenced block at offset {match.start()}: {e}"
                 )
+
+        # Parse yurtle-table blocks
+        self._parse_table_blocks(content, graph)
+
+    def _parse_table_blocks(self, content: str, graph: Graph) -> None:
+        """Parse ```yurtle-table fenced blocks into RDF triples.
+
+        A yurtle-table block contains:
+        1. Optional @prefix declarations
+        2. Optional @type directive (sets rdf:type for all rows)
+        3. A markdown table where:
+           - Headers are predicate URIs (resolved against prefixes)
+           - @id column is the subject URI for each row
+           - Empty cells produce no triple
+        """
+        for match in self.FENCED_TABLE_PATTERN.finditer(content):
+            block_content = match.group(1).strip()
+            if not block_content:
+                continue
+            try:
+                self._parse_single_table_block(block_content, graph)
+            except Exception as e:
+                self.logger.debug(
+                    f"Failed to parse yurtle-table block at offset "
+                    f"{match.start()}: {e}"
+                )
+
+    def _parse_single_table_block(
+        self, block_content: str, graph: Graph
+    ) -> None:
+        """Parse a single yurtle-table block and add triples to graph."""
+        # 1. Collect prefixes: inherited from graph + declared in block
+        prefixes: Dict[str, str] = {}
+        for prefix, ns in graph.namespace_manager.namespaces():
+            if prefix:
+                prefixes[prefix] = str(ns)
+
+        for m in self._TABLE_PREFIX_DECL.finditer(block_content):
+            prefix_name = m.group(1)
+            prefix_uri = m.group(2)
+            prefixes[prefix_name] = prefix_uri
+            graph.bind(prefix_name, Namespace(prefix_uri))
+
+        # 2. Extract @type directive
+        row_type_uri: Optional[URIRef] = None
+        type_match = self._TABLE_TYPE_DIRECTIVE.search(block_content)
+        if type_match:
+            raw_type = type_match.group(1).strip()
+            row_type_uri = self._resolve_prefixed_name(raw_type, prefixes)
+
+        # 3. Find the markdown table lines
+        lines = block_content.split('\n')
+        table_lines: List[str] = []
+        for line in lines:
+            stripped = line.strip()
+            if stripped.startswith('|'):
+                table_lines.append(stripped)
+
+        if len(table_lines) < 2:
+            return  # Need at least header + separator (or header + data)
+
+        # 4. Parse header row → predicate URIs
+        header_line = table_lines[0]
+        headers = [h.strip() for h in header_line.split('|')[1:-1]]
+
+        # Find the @id column index
+        id_col: Optional[int] = None
+        predicate_map: Dict[int, Optional[URIRef]] = {}
+
+        for i, header in enumerate(headers):
+            if header == '@id':
+                id_col = i
+                predicate_map[i] = None  # @id is not a predicate
+            elif header == '@type':
+                predicate_map[i] = RDF.type
+            else:
+                predicate_map[i] = self._resolve_prefixed_name(
+                    header, prefixes
+                )
+
+        if id_col is None:
+            self.logger.debug("yurtle-table block missing @id column")
+            return
+
+        # 5. Parse data rows (skip separator rows)
+        for table_line in table_lines[1:]:
+            if self._TABLE_SEPARATOR.match(table_line):
+                continue
+
+            cells = [c.strip() for c in table_line.split('|')[1:-1]]
+
+            # Pad cells if row is shorter than header
+            while len(cells) < len(headers):
+                cells.append('')
+
+            # Get subject from @id column
+            subject_raw = cells[id_col] if id_col < len(cells) else ''
+            if not subject_raw:
+                continue
+
+            subject = self._resolve_prefixed_name(subject_raw, prefixes)
+
+            # Add @type triple if @type directive present
+            if row_type_uri is not None:
+                graph.add((subject, RDF.type, row_type_uri))
+
+            # Add triples for each non-empty cell
+            for col_idx, cell_value in enumerate(cells):
+                if col_idx == id_col:
+                    continue
+                if not cell_value:
+                    continue
+
+                predicate = predicate_map.get(col_idx)
+                if predicate is None:
+                    continue
+
+                # For @type column, resolve as URI
+                if predicate == RDF.type:
+                    obj = self._resolve_prefixed_name(cell_value, prefixes)
+                    graph.add((subject, predicate, obj))
+                else:
+                    obj = self._infer_literal(cell_value, prefixes)
+                    graph.add((subject, predicate, obj))
+
+    def _resolve_prefixed_name(
+        self, name: str, prefixes: Dict[str, str]
+    ) -> URIRef:
+        """Resolve a prefixed name (e.g., 'kb:Phase') to a full URIRef.
+
+        Handles:
+        - Prefixed names: 'kb:Phase' → URIRef(kb_namespace + 'Phase')
+        - Fragment references: '#phase-1' → URIRef('#phase-1')
+        - Full URIs: '<http://...>' → URIRef('http://...')
+        - Bare names: 'something' → URIRef('something')
+        """
+        name = name.strip()
+
+        # Full URI in angle brackets
+        if name.startswith('<') and name.endswith('>'):
+            return URIRef(name[1:-1])
+
+        # Fragment reference
+        if name.startswith('#'):
+            return URIRef(name)
+
+        # Prefixed name
+        if ':' in name:
+            prefix, local = name.split(':', 1)
+            ns = prefixes.get(prefix)
+            if ns is not None:
+                return URIRef(ns + local)
+
+        return URIRef(name)
+
+    def _infer_literal(
+        self, value: str, prefixes: Dict[str, str]
+    ) -> Union[Literal, URIRef]:
+        """Infer the RDF type of a table cell value.
+
+        Type inference:
+        - Integer-looking values ('1', '42') → xsd:integer
+        - Date-looking values ('2026-02-27') → xsd:date
+        - URI references ('#foo', 'http://...', 'prefix:local') → URIRef
+        - Everything else → xsd:string (plain Literal)
+        """
+        # Check for URI-like values
+        if value.startswith('#') or value.startswith('<'):
+            return self._resolve_prefixed_name(value, prefixes)
+        if value.startswith('http://') or value.startswith('https://'):
+            return URIRef(value)
+
+        # Check for prefixed name that looks like a URI reference
+        if ':' in value and not self._DATE_PATTERN.match(value):
+            prefix = value.split(':', 1)[0]
+            if prefix in prefixes:
+                return self._resolve_prefixed_name(value, prefixes)
+
+        # Date
+        if self._DATE_PATTERN.match(value):
+            return Literal(value, datatype=XSD.date)
+
+        # Integer
+        try:
+            int_val = int(value)
+            return Literal(int_val, datatype=XSD.integer)
+        except ValueError:
+            pass
+
+        # Plain string
+        return Literal(value)
 
     @staticmethod
     def _build_prefix_header(graph: Graph) -> str:
