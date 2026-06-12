@@ -18,7 +18,7 @@ This enables every `.md` file to be both a document AND a node in a knowledge gr
 
 ```markdown
 ---
-yurtle: v1.3
+yurtle: v2.0
 id: nautical-project/ship
 type: asset
 title: Clipper Windchaser
