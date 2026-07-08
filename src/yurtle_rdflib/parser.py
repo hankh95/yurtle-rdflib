@@ -23,11 +23,9 @@ License: MIT
 """
 
 import logging
-from io import BytesIO, StringIO
 from pathlib import Path
-from typing import IO, Optional, Union
 
-from rdflib import Graph, URIRef, Namespace
+from rdflib import Graph, Namespace, URIRef
 from rdflib.parser import Parser
 from rdflib.plugin import register
 
@@ -63,7 +61,7 @@ class YurtleRDFlibParser(Parser):
         self._core_parser = CoreYurtleParser()
 
     def parse(
-        self, source, sink: Graph, format: Optional[str] = None, encoding: str = "utf-8", **kwargs
+        self, source, sink: Graph, format: str | None = None, encoding: str = "utf-8", **kwargs
     ) -> None:
         """
         Parse a Yurtle document into an RDFlib graph.
@@ -141,7 +139,7 @@ class YurtleRDFlibParser(Parser):
 
         raise ValueError(f"Cannot extract content from source: {type(source)}")
 
-    def _get_source_path(self, source) -> Optional[Path]:
+    def _get_source_path(self, source) -> Path | None:
         """Extract file path from source if available."""
         # Try system ID
         if hasattr(source, "getSystemId"):

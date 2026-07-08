@@ -12,11 +12,10 @@ into RDF triples. Covers:
 - Integration with frontmatter prefixes
 """
 
-import pytest
-from rdflib import Graph, URIRef, Literal, Namespace
+from rdflib import Literal, Namespace, URIRef
 from rdflib.namespace import RDF, RDFS, XSD
 
-from yurtle_rdflib import YurtleParser, YURTLE
+from yurtle_rdflib import YurtleParser
 
 KB = Namespace("https://yurtle.dev/kanban/")
 
@@ -390,7 +389,7 @@ class TestEdgeCases:
         parser = YurtleParser()
         doc = parser.parse(text)
         # Should not crash, no data triples
-        kb_triples = list(g.triples((None, KB.name, None)) for g in [doc.graph])
+        list(g.triples((None, KB.name, None)) for g in [doc.graph])
         assert True  # Just verifying no crash
 
     def test_short_row_padded(self):

@@ -3,11 +3,7 @@ Shared pytest fixtures for yurtle-rdflib tests.
 """
 
 import pytest
-from pathlib import Path
-import tempfile
-import shutil
-
-from rdflib import Graph, URIRef, Literal, Namespace
+from rdflib import Graph, Literal, URIRef
 
 # Import the package to register plugins
 import yurtle_rdflib

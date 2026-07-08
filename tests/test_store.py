@@ -2,13 +2,10 @@
 Tests for the YurtleStore.
 """
 
-import pytest
-from pathlib import Path
-from rdflib import Graph, URIRef, Literal
+from rdflib import Graph, Literal, URIRef
 
 import yurtle_rdflib
-from yurtle_rdflib import YurtleStore, YURTLE, PM
-from yurtle_rdflib.namespaces import PROVENANCE
+from yurtle_rdflib import YURTLE, YurtleStore
 
 
 class TestYurtleStoreInit:

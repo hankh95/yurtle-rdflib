@@ -32,16 +32,15 @@ License: MIT
 
 import logging
 import re
-from io import BytesIO, StringIO
 from pathlib import Path
-from typing import IO, Optional, Union
+from typing import IO
 
-from rdflib import Graph, URIRef, Literal, BNode, Namespace
-from rdflib.serializer import Serializer
-from rdflib.plugin import register
+from rdflib import Graph, URIRef
 from rdflib.namespace import RDF, RDFS, XSD
+from rdflib.plugin import register
+from rdflib.serializer import Serializer
 
-from .namespaces import YURTLE, PM, BEING, PROVENANCE
+from .namespaces import BEING, PM, PROVENANCE, YURTLE
 
 logger = logging.getLogger(__name__)
 
@@ -68,8 +67,8 @@ class YurtleRDFlibSerializer(Serializer):
     def serialize(
         self,
         stream: IO[bytes],
-        base: Optional[str] = None,
-        encoding: Optional[str] = "utf-8",
+        base: str | None = None,
+        encoding: str | None = "utf-8",
         **kwargs,
     ) -> None:
         """
@@ -202,7 +201,7 @@ class YurtleRDFlibSerializer(Serializer):
 
         return "\n".join(parts)
 
-    def _extract_markdown_from_file(self, file_path: Union[str, Path]) -> str:
+    def _extract_markdown_from_file(self, file_path: str | Path) -> str:
         """
         Extract markdown content from an existing Yurtle file.
 

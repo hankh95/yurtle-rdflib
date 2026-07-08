@@ -2,12 +2,10 @@
 Tests for workspace loading and saving.
 """
 
-import pytest
-from pathlib import Path
-from rdflib import Graph, URIRef, Literal
+from rdflib import Graph, Literal, URIRef
 
 import yurtle_rdflib
-from yurtle_rdflib import YURTLE, PM
+from yurtle_rdflib import YURTLE
 from yurtle_rdflib.namespaces import PROVENANCE
 
 

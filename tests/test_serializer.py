@@ -2,12 +2,10 @@
 Tests for the Yurtle serializer.
 """
 
-import pytest
-from pathlib import Path
-from rdflib import Graph, URIRef, Literal
+from rdflib import Graph, Literal, URIRef
 
 import yurtle_rdflib
-from yurtle_rdflib import YurtleWriter, YurtleDocument, YURTLE, PM
+from yurtle_rdflib import YURTLE, YurtleDocument, YurtleWriter
 
 
 class TestYurtleWriter:

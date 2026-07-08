@@ -33,21 +33,14 @@ License: MIT
 
 import logging
 from pathlib import Path
-from typing import Optional, List, Union
 
-from rdflib import Graph, URIRef, Namespace
-from rdflib.namespace import RDF, RDFS
-
-# Import plugins (registers them with rdflib on import)
-from .parser import YurtleRDFlibParser  # noqa: F401
-from .serializer import YurtleRDFlibSerializer  # noqa: F401
-from .store import YurtleStore, create_yurtle_graph
+from rdflib import Graph, URIRef
 
 # Re-export core components
 from .core import (
+    YurtleDocument,
     YurtleParser,
     YurtleWriter,
-    YurtleDocument,
     parse_yurtle,
     parse_yurtle_file,
     scan_workspace_graph,
@@ -55,15 +48,20 @@ from .core import (
 
 # Re-export namespaces
 from .namespaces import (
-    YURTLE,
-    PM,
     BEING,
-    VOYAGE,
     KNOWLEDGE,
+    PM,
     PROVENANCE,
     STANDARD_NAMESPACES,
+    VOYAGE,
+    YURTLE,
     bind_standard_namespaces,
 )
+
+# Import plugins (registers them with rdflib on import)
+from .parser import YurtleRDFlibParser  # noqa: F401
+from .serializer import YurtleRDFlibSerializer  # noqa: F401
+from .store import YurtleStore, create_yurtle_graph
 
 logger = logging.getLogger(__name__)
 
@@ -107,8 +105,8 @@ __all__ = [
 
 
 def load_workspace(
-    workspace_path: Union[str, Path],
-    patterns: Optional[List[str]] = None,
+    workspace_path: str | Path,
+    patterns: list[str] | None = None,
 ) -> Graph:
     """
     Load all Yurtle files in a workspace into a unified graph.
@@ -167,7 +165,7 @@ def load_workspace(
 
 def save_workspace(
     graph: Graph,
-    workspace_path: Union[str, Path],
+    workspace_path: str | Path,
 ) -> int:
     """
     Save a graph back to workspace files, grouped by provenance.
@@ -187,7 +185,6 @@ def save_workspace(
         graph.add((subject, predicate, object))
         save_workspace(graph, "my-project/")
     """
-    workspace = Path(workspace_path)
     writer = YurtleWriter()
 
     # Group subjects by their source file
@@ -270,8 +267,8 @@ def _extract_markdown(file_path: Path) -> str:
 
 
 def create_live_graph(
-    workspace_path: Union[str, Path],
-    patterns: Optional[List[str]] = None,
+    workspace_path: str | Path,
+    patterns: list[str] | None = None,
     auto_flush: bool = True,
 ) -> Graph:
     """
@@ -301,7 +298,7 @@ def create_live_graph(
     )
 
 
-def parse_file(file_path: Union[str, Path]) -> Graph:
+def parse_file(file_path: str | Path) -> Graph:
     """
     Parse a single Yurtle file into a graph.
 
@@ -321,7 +318,7 @@ def parse_file(file_path: Union[str, Path]) -> Graph:
 
 def serialize_file(
     graph: Graph,
-    file_path: Union[str, Path],
+    file_path: str | Path,
     markdown_content: str = "",
 ) -> None:
     """
@@ -357,8 +354,8 @@ def verify_plugins() -> dict:
     Returns:
         Dict with registration status for each plugin type
     """
-    from rdflib.plugin import get as get_plugin
     from rdflib.parser import Parser
+    from rdflib.plugin import get as get_plugin
     from rdflib.serializer import Serializer
 
     results = {

@@ -2,12 +2,10 @@
 Tests for the Yurtle parser.
 """
 
-import pytest
-from pathlib import Path
-from rdflib import Graph, URIRef, Literal, Namespace
+from rdflib import Graph, Namespace, URIRef
 
 import yurtle_rdflib
-from yurtle_rdflib import YurtleParser, YurtleDocument, YURTLE, PM
+from yurtle_rdflib import PM, YURTLE, YurtleParser
 
 
 class TestYurtleParser:
@@ -190,7 +188,7 @@ class TestFencedBlockParsing:
         assert len(doc.graph) > 0
 
         # Fenced turtle block triples should also be in the graph
-        ylayer = Namespace("https://nusy.dev/ylayer/")
+        Namespace("https://nusy.dev/ylayer/")
         subjects = [str(s) for s in doc.graph.subjects()]
         # The <#chunk-storage> subject from the turtle block
         assert any("chunk-storage" in s for s in subjects)
@@ -302,7 +300,7 @@ not valid turtle!!!
 """
         parser = YurtleParser()
         with caplog.at_level(logging.DEBUG, logger="yurtle-parser"):
-            doc = parser.parse(text)
+            parser.parse(text)
         assert any("offset" in record.message for record in caplog.records)
 
     def test_crlf_line_endings(self):
@@ -649,7 +647,7 @@ title: Test
 """
         parser = YurtleParser()
         with caplog.at_level(logging.DEBUG, logger="yurtle-parser"):
-            doc = parser.parse(text)
+            parser.parse(text)
 
         # Should be logged at DEBUG level, not WARNING
         parse_msgs = [r for r in caplog.records if "Failed to parse" in r.message]

@@ -34,14 +34,15 @@ BACKWARDS COMPATIBLE:
 License: MIT
 """
 
-import re
-import yaml
-from pathlib import Path
-from typing import Dict, Any, Optional, Tuple, Union, List
-from dataclasses import dataclass
-from rdflib import Graph, Namespace, URIRef, Literal
-from rdflib.namespace import RDF, RDFS, XSD
 import logging
+import re
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any
+
+import yaml
+from rdflib import Graph, Literal, Namespace, URIRef
+from rdflib.namespace import RDF, RDFS, XSD
 
 logger = logging.getLogger(__name__)
 
@@ -70,27 +71,27 @@ class YurtleDocument:
     frontmatter_type: str  # "turtle" | "yaml" | "none"
 
     # File path if loaded from file
-    source_path: Optional[Path] = None
+    source_path: Path | None = None
 
     # The subject URI (main entity this doc describes)
-    subject_uri: Optional[URIRef] = None
+    subject_uri: URIRef | None = None
 
-    def get_property(self, predicate: URIRef) -> Optional[str]:
+    def get_property(self, predicate: URIRef) -> str | None:
         """Get a single property value from the graph."""
         if self.subject_uri:
             for obj in self.graph.objects(self.subject_uri, predicate):
                 return str(obj)
         return None
 
-    def get_properties(self, predicate: URIRef) -> List[str]:
+    def get_properties(self, predicate: URIRef) -> list[str]:
         """Get all values for a predicate."""
         if self.subject_uri:
             return [str(obj) for obj in self.graph.objects(self.subject_uri, predicate)]
         return []
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert graph to dictionary (for YAML compatibility)."""
-        result: Dict[str, Any] = {}
+        result: dict[str, Any] = {}
         if self.subject_uri:
             for pred, obj in self.graph.predicate_objects(self.subject_uri):
                 key = str(pred).split("/")[-1].split("#")[-1]
@@ -149,7 +150,7 @@ class YurtleParser:
     def __init__(self):
         self.logger = logging.getLogger("yurtle-parser")
 
-    def parse(self, text: str, source_path: Optional[Path] = None) -> YurtleDocument:
+    def parse(self, text: str, source_path: Path | None = None) -> YurtleDocument:
         """
         Parse a Yurtle document from text.
 
@@ -199,7 +200,7 @@ class YurtleParser:
             subject_uri=subject_uri,
         )
 
-    def parse_file(self, path: Union[str, Path]) -> YurtleDocument:
+    def parse_file(self, path: str | Path) -> YurtleDocument:
         """Parse a Yurtle document from a file."""
         path = Path(path)
         text = path.read_text(encoding="utf-8")
@@ -294,7 +295,7 @@ class YurtleParser:
     def _parse_single_table_block(self, block_content: str, graph: Graph) -> None:
         """Parse a single yurtle-table block and add triples to graph."""
         # 1. Collect prefixes: inherited from graph + declared in block
-        prefixes: Dict[str, str] = {}
+        prefixes: dict[str, str] = {}
         for prefix, ns in graph.namespace_manager.namespaces():
             if prefix:
                 prefixes[prefix] = str(ns)
@@ -306,7 +307,7 @@ class YurtleParser:
             graph.bind(prefix_name, Namespace(prefix_uri))
 
         # 2. Extract @type directive
-        row_type_uri: Optional[URIRef] = None
+        row_type_uri: URIRef | None = None
         type_match = self._TABLE_TYPE_DIRECTIVE.search(block_content)
         if type_match:
             raw_type = type_match.group(1).strip()
@@ -314,7 +315,7 @@ class YurtleParser:
 
         # 3. Find the markdown table lines
         lines = block_content.split("\n")
-        table_lines: List[str] = []
+        table_lines: list[str] = []
         for line in lines:
             stripped = line.strip()
             if stripped.startswith("|"):
@@ -328,8 +329,8 @@ class YurtleParser:
         headers = [h.strip() for h in header_line.split("|")[1:-1]]
 
         # Find the @id column index
-        id_col: Optional[int] = None
-        predicate_map: Dict[int, Optional[URIRef]] = {}
+        id_col: int | None = None
+        predicate_map: dict[int, URIRef | None] = {}
 
         for i, header in enumerate(headers):
             if header == "@id":
@@ -378,7 +379,7 @@ class YurtleParser:
                     continue
 
                 # For @type column, resolve as URI
-                obj: Union[Literal, URIRef]
+                obj: Literal | URIRef
                 if predicate == RDF.type:
                     obj = self._resolve_prefixed_name(cell_value, prefixes)
                     graph.add((subject, predicate, obj))
@@ -386,7 +387,7 @@ class YurtleParser:
                     obj = self._infer_literal(cell_value, prefixes)
                     graph.add((subject, predicate, obj))
 
-    def _resolve_prefixed_name(self, name: str, prefixes: Dict[str, str]) -> URIRef:
+    def _resolve_prefixed_name(self, name: str, prefixes: dict[str, str]) -> URIRef:
         """Resolve a prefixed name (e.g., 'kb:Phase') to a full URIRef.
 
         Handles:
@@ -414,7 +415,7 @@ class YurtleParser:
 
         return URIRef(name)
 
-    def _infer_literal(self, value: str, prefixes: Dict[str, str]) -> Union[Literal, URIRef]:
+    def _infer_literal(self, value: str, prefixes: dict[str, str]) -> Literal | URIRef:
         """Infer the RDF type of a table cell value.
 
         Type inference:
@@ -502,8 +503,8 @@ class YurtleParser:
         )
 
     def _parse_turtle(
-        self, frontmatter: str, source_path: Optional[Path]
-    ) -> Tuple[Graph, Optional[URIRef]]:
+        self, frontmatter: str, source_path: Path | None
+    ) -> tuple[Graph, URIRef | None]:
         """Parse Turtle frontmatter into an RDF graph."""
         graph = Graph()
 
@@ -533,8 +534,8 @@ class YurtleParser:
             return Graph(), None
 
     def _parse_yaml(
-        self, frontmatter: str, source_path: Optional[Path]
-    ) -> Tuple[Graph, Optional[URIRef]]:
+        self, frontmatter: str, source_path: Path | None
+    ) -> tuple[Graph, URIRef | None]:
         """Parse YAML frontmatter and convert to RDF graph."""
         graph = Graph()
 
@@ -564,7 +565,7 @@ class YurtleParser:
             self.logger.error(f"Failed to parse YAML frontmatter: {e}")
             return Graph(), None
 
-    def _yaml_to_triples(self, graph: Graph, subject: URIRef, data: Dict[str, Any]):
+    def _yaml_to_triples(self, graph: Graph, subject: URIRef, data: dict[str, Any]):
         """Convert YAML dict to RDF triples."""
         # Map common YAML keys to predicates
         key_mappings = {
@@ -595,7 +596,7 @@ class YurtleParser:
 
     def _add_triple(self, graph: Graph, subject: URIRef, predicate: URIRef, value: Any):
         """Add a triple with appropriate literal type."""
-        obj: Union[Literal, URIRef]
+        obj: Literal | URIRef
         if isinstance(value, bool):
             obj = Literal(value, datatype=XSD.boolean)
         elif isinstance(value, int):
@@ -643,7 +644,7 @@ class YurtleWriter:
             return result.decode("utf-8")
         return result
 
-    def write_file(self, doc: YurtleDocument, path: Union[str, Path]):
+    def write_file(self, doc: YurtleDocument, path: str | Path):
         """Write a YurtleDocument to a file."""
         path = Path(path)
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -654,21 +655,19 @@ class YurtleWriter:
 # Convenience functions
 
 
-def parse_yurtle(text: str, source_path: Optional[Path] = None) -> YurtleDocument:
+def parse_yurtle(text: str, source_path: Path | None = None) -> YurtleDocument:
     """Parse a Yurtle document from text."""
     parser = YurtleParser()
     return parser.parse(text, source_path)
 
 
-def parse_yurtle_file(path: Union[str, Path]) -> YurtleDocument:
+def parse_yurtle_file(path: str | Path) -> YurtleDocument:
     """Parse a Yurtle document from a file."""
     parser = YurtleParser()
     return parser.parse_file(path)
 
 
-def scan_workspace_graph(
-    workspace_path: Union[str, Path], patterns: Optional[List[str]] = None
-) -> Graph:
+def scan_workspace_graph(workspace_path: str | Path, patterns: list[str] | None = None) -> Graph:
     """
     Scan a workspace and build a unified knowledge graph from all Yurtle files.
 
