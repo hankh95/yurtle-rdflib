@@ -54,12 +54,12 @@ class TestYurtleStoreSync:
         initial_count = len(store.file_states)
 
         # Add new file
-        (temp_workspace / "new.md").write_text('''---
+        (temp_workspace / "new.md").write_text("""---
 @prefix yurtle: <https://yurtle.dev/schema/> .
 <urn:task:new> yurtle:title "New" .
 ---
 # New
-''')
+""")
 
         synced = store.sync()
 

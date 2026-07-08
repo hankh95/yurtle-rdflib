@@ -93,7 +93,7 @@ class YurtleDocument:
         result: Dict[str, Any] = {}
         if self.subject_uri:
             for pred, obj in self.graph.predicate_objects(self.subject_uri):
-                key = str(pred).split('/')[-1].split('#')[-1]
+                key = str(pred).split("/")[-1].split("#")[-1]
                 value = str(obj)
                 if key in result:
                     if isinstance(result[key], list):
@@ -116,43 +116,34 @@ class YurtleParser:
     """
 
     # Regex to extract frontmatter
-    FRONTMATTER_PATTERN = re.compile(
-        r'^---\s*\n(.*?)\n---\s*\n(.*)$',
-        re.DOTALL
-    )
+    FRONTMATTER_PATTERN = re.compile(r"^---\s*\n(.*?)\n---\s*\n(.*)$", re.DOTALL)
 
     # Regex to extract fenced turtle/yurtle blocks from markdown body.
     # Handles: trailing spaces after language tag, CRLF line endings,
     # and line-anchored closing fence (CommonMark compliance).
     FENCED_BLOCK_PATTERN = re.compile(
-        r'```(?:turtle|yurtle)\s*\r?\n(.*?)^```',
-        re.DOTALL | re.MULTILINE
+        r"```(?:turtle|yurtle)\s*\r?\n(.*?)^```", re.DOTALL | re.MULTILINE
     )
 
     # Regex to extract fenced yurtle-table blocks from markdown body.
-    FENCED_TABLE_PATTERN = re.compile(
-        r'```yurtle-table\s*\r?\n(.*?)^```',
-        re.DOTALL | re.MULTILINE
-    )
+    FENCED_TABLE_PATTERN = re.compile(r"```yurtle-table\s*\r?\n(.*?)^```", re.DOTALL | re.MULTILINE)
 
     # Patterns for yurtle-table directive parsing
-    _TABLE_TYPE_DIRECTIVE = re.compile(r'^@type\s+(.+?)\s*$', re.MULTILINE)
-    _TABLE_PREFIX_DECL = re.compile(
-        r'^@prefix\s+(\w*):\s*<([^>]+)>\s*\.\s*$', re.MULTILINE
-    )
-    _TABLE_SEPARATOR = re.compile(r'^\|[\s:]*-+[\s:|-]*\|$')
-    _DATE_PATTERN = re.compile(r'^\d{4}-\d{2}-\d{2}$')
+    _TABLE_TYPE_DIRECTIVE = re.compile(r"^@type\s+(.+?)\s*$", re.MULTILINE)
+    _TABLE_PREFIX_DECL = re.compile(r"^@prefix\s+(\w*):\s*<([^>]+)>\s*\.\s*$", re.MULTILINE)
+    _TABLE_SEPARATOR = re.compile(r"^\|[\s:]*-+[\s:|-]*\|$")
+    _DATE_PATTERN = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
     # Standard namespace prefixes
     STANDARD_PREFIXES = {
-        'yurtle': YURTLE,
-        'pm': PM,
-        'being': BEING,
-        'voyage': VOYAGE,
-        'knowledge': KNOWLEDGE,
-        'rdf': RDF,
-        'rdfs': RDFS,
-        'xsd': XSD,
+        "yurtle": YURTLE,
+        "pm": PM,
+        "being": BEING,
+        "voyage": VOYAGE,
+        "knowledge": KNOWLEDGE,
+        "rdf": RDF,
+        "rdfs": RDFS,
+        "xsd": XSD,
     }
 
     def __init__(self):
@@ -182,7 +173,7 @@ class YurtleParser:
                 content=text,
                 frontmatter_raw="",
                 frontmatter_type="none",
-                source_path=source_path
+                source_path=source_path,
             )
 
         frontmatter_raw = match.group(1)
@@ -205,18 +196,18 @@ class YurtleParser:
             frontmatter_raw=frontmatter_raw,
             frontmatter_type=frontmatter_type,
             source_path=source_path,
-            subject_uri=subject_uri
+            subject_uri=subject_uri,
         )
 
     def parse_file(self, path: Union[str, Path]) -> YurtleDocument:
         """Parse a Yurtle document from a file."""
         path = Path(path)
-        text = path.read_text(encoding='utf-8')
+        text = path.read_text(encoding="utf-8")
         return self.parse(text, source_path=path)
 
     # Heuristic patterns for detecting non-Turtle content in fenced blocks
-    _YAML_FIRST_LINE = re.compile(r'^[a-zA-Z_][\w-]*:\s*$')
-    _MERGE_CONFLICT = re.compile(r'^<{7}\s|^={7}\s*$|^>{7}\s', re.MULTILINE)
+    _YAML_FIRST_LINE = re.compile(r"^[a-zA-Z_][\w-]*:\s*$")
+    _MERGE_CONFLICT = re.compile(r"^<{7}\s|^={7}\s*$|^>{7}\s", re.MULTILINE)
 
     def _parse_blocks(self, content: str, graph: Graph) -> None:
         """
@@ -254,8 +245,7 @@ class YurtleParser:
             # Skip blocks that look like YAML, not Turtle
             if self._looks_like_yaml(block_content):
                 self.logger.debug(
-                    "Skipping non-Turtle content in fenced block "
-                    f"at offset {match.start()}"
+                    "Skipping non-Turtle content in fenced block " f"at offset {match.start()}"
                 )
                 continue
 
@@ -272,11 +262,9 @@ class YurtleParser:
                 # namespace context.  Any @prefix in the block itself will
                 # override the injected ones (last declaration wins).
                 enriched = prefix_header + block_content
-                graph.parse(data=enriched, format='turtle')
+                graph.parse(data=enriched, format="turtle")
             except Exception as e:
-                self.logger.debug(
-                    f"Failed to parse fenced block at offset {match.start()}: {e}"
-                )
+                self.logger.debug(f"Failed to parse fenced block at offset {match.start()}: {e}")
 
         # Parse yurtle-table blocks
         self._parse_table_blocks(content, graph)
@@ -300,13 +288,10 @@ class YurtleParser:
                 self._parse_single_table_block(block_content, graph)
             except Exception as e:
                 self.logger.debug(
-                    f"Failed to parse yurtle-table block at offset "
-                    f"{match.start()}: {e}"
+                    f"Failed to parse yurtle-table block at offset " f"{match.start()}: {e}"
                 )
 
-    def _parse_single_table_block(
-        self, block_content: str, graph: Graph
-    ) -> None:
+    def _parse_single_table_block(self, block_content: str, graph: Graph) -> None:
         """Parse a single yurtle-table block and add triples to graph."""
         # 1. Collect prefixes: inherited from graph + declared in block
         prefixes: Dict[str, str] = {}
@@ -328,11 +313,11 @@ class YurtleParser:
             row_type_uri = self._resolve_prefixed_name(raw_type, prefixes)
 
         # 3. Find the markdown table lines
-        lines = block_content.split('\n')
+        lines = block_content.split("\n")
         table_lines: List[str] = []
         for line in lines:
             stripped = line.strip()
-            if stripped.startswith('|'):
+            if stripped.startswith("|"):
                 table_lines.append(stripped)
 
         if len(table_lines) < 2:
@@ -340,22 +325,20 @@ class YurtleParser:
 
         # 4. Parse header row → predicate URIs
         header_line = table_lines[0]
-        headers = [h.strip() for h in header_line.split('|')[1:-1]]
+        headers = [h.strip() for h in header_line.split("|")[1:-1]]
 
         # Find the @id column index
         id_col: Optional[int] = None
         predicate_map: Dict[int, Optional[URIRef]] = {}
 
         for i, header in enumerate(headers):
-            if header == '@id':
+            if header == "@id":
                 id_col = i
                 predicate_map[i] = None  # @id is not a predicate
-            elif header == '@type':
+            elif header == "@type":
                 predicate_map[i] = RDF.type
             else:
-                predicate_map[i] = self._resolve_prefixed_name(
-                    header, prefixes
-                )
+                predicate_map[i] = self._resolve_prefixed_name(header, prefixes)
 
         if id_col is None:
             self.logger.debug("yurtle-table block missing @id column")
@@ -366,14 +349,14 @@ class YurtleParser:
             if self._TABLE_SEPARATOR.match(table_line):
                 continue
 
-            cells = [c.strip() for c in table_line.split('|')[1:-1]]
+            cells = [c.strip() for c in table_line.split("|")[1:-1]]
 
             # Pad cells if row is shorter than header
             while len(cells) < len(headers):
-                cells.append('')
+                cells.append("")
 
             # Get subject from @id column
-            subject_raw = cells[id_col] if id_col < len(cells) else ''
+            subject_raw = cells[id_col] if id_col < len(cells) else ""
             if not subject_raw:
                 continue
 
@@ -395,6 +378,7 @@ class YurtleParser:
                     continue
 
                 # For @type column, resolve as URI
+                obj: Union[Literal, URIRef]
                 if predicate == RDF.type:
                     obj = self._resolve_prefixed_name(cell_value, prefixes)
                     graph.add((subject, predicate, obj))
@@ -402,9 +386,7 @@ class YurtleParser:
                     obj = self._infer_literal(cell_value, prefixes)
                     graph.add((subject, predicate, obj))
 
-    def _resolve_prefixed_name(
-        self, name: str, prefixes: Dict[str, str]
-    ) -> URIRef:
+    def _resolve_prefixed_name(self, name: str, prefixes: Dict[str, str]) -> URIRef:
         """Resolve a prefixed name (e.g., 'kb:Phase') to a full URIRef.
 
         Handles:
@@ -416,25 +398,23 @@ class YurtleParser:
         name = name.strip()
 
         # Full URI in angle brackets
-        if name.startswith('<') and name.endswith('>'):
+        if name.startswith("<") and name.endswith(">"):
             return URIRef(name[1:-1])
 
         # Fragment reference
-        if name.startswith('#'):
+        if name.startswith("#"):
             return URIRef(name)
 
         # Prefixed name
-        if ':' in name:
-            prefix, local = name.split(':', 1)
+        if ":" in name:
+            prefix, local = name.split(":", 1)
             ns = prefixes.get(prefix)
             if ns is not None:
                 return URIRef(ns + local)
 
         return URIRef(name)
 
-    def _infer_literal(
-        self, value: str, prefixes: Dict[str, str]
-    ) -> Union[Literal, URIRef]:
+    def _infer_literal(self, value: str, prefixes: Dict[str, str]) -> Union[Literal, URIRef]:
         """Infer the RDF type of a table cell value.
 
         Type inference:
@@ -444,14 +424,14 @@ class YurtleParser:
         - Everything else → xsd:string (plain Literal)
         """
         # Check for URI-like values
-        if value.startswith('#') or value.startswith('<'):
+        if value.startswith("#") or value.startswith("<"):
             return self._resolve_prefixed_name(value, prefixes)
-        if value.startswith('http://') or value.startswith('https://'):
+        if value.startswith("http://") or value.startswith("https://"):
             return URIRef(value)
 
         # Check for prefixed name that looks like a URI reference
-        if ':' in value and not self._DATE_PATTERN.match(value):
-            prefix = value.split(':', 1)[0]
+        if ":" in value and not self._DATE_PATTERN.match(value):
+            prefix = value.split(":", 1)[0]
             if prefix in prefixes:
                 return self._resolve_prefixed_name(value, prefixes)
 
@@ -494,12 +474,12 @@ class YurtleParser:
         These patterns don't occur in valid Turtle, so false positives
         are unlikely.
         """
-        for line in content.split('\n'):
+        for line in content.split("\n"):
             line = line.strip()
-            if not line or line.startswith('#'):
+            if not line or line.startswith("#"):
                 continue
             # YAML document start
-            if line == '---':
+            if line == "---":
                 return True
             # YAML block mapping key: "key:" at end of line
             # In Turtle, "prefix:" is always followed by a local name
@@ -514,14 +494,16 @@ class YurtleParser:
         stripped = frontmatter.strip()
         # Turtle starts with @prefix, @base, or a URI
         return (
-            stripped.startswith('@prefix') or
-            stripped.startswith('@base') or
-            stripped.startswith('<') or
-            stripped.startswith('PREFIX') or
-            stripped.startswith('BASE')
+            stripped.startswith("@prefix")
+            or stripped.startswith("@base")
+            or stripped.startswith("<")
+            or stripped.startswith("PREFIX")
+            or stripped.startswith("BASE")
         )
 
-    def _parse_turtle(self, frontmatter: str, source_path: Optional[Path]) -> Tuple[Graph, Optional[URIRef]]:
+    def _parse_turtle(
+        self, frontmatter: str, source_path: Optional[Path]
+    ) -> Tuple[Graph, Optional[URIRef]]:
         """Parse Turtle frontmatter into an RDF graph."""
         graph = Graph()
 
@@ -530,7 +512,7 @@ class YurtleParser:
             graph.bind(prefix, ns)
 
         try:
-            graph.parse(data=frontmatter, format='turtle')
+            graph.parse(data=frontmatter, format="turtle")
 
             # Find the main subject (first subject that's a URIRef)
             subject_uri = None
@@ -550,7 +532,9 @@ class YurtleParser:
             self.logger.error(f"Failed to parse Turtle frontmatter: {e}")
             return Graph(), None
 
-    def _parse_yaml(self, frontmatter: str, source_path: Optional[Path]) -> Tuple[Graph, Optional[URIRef]]:
+    def _parse_yaml(
+        self, frontmatter: str, source_path: Optional[Path]
+    ) -> Tuple[Graph, Optional[URIRef]]:
         """Parse YAML frontmatter and convert to RDF graph."""
         graph = Graph()
 
@@ -566,7 +550,7 @@ class YurtleParser:
             # Create subject URI
             if source_path:
                 subject_uri = self._uri_from_path(source_path)
-            elif 'id' in data:
+            elif "id" in data:
                 subject_uri = URIRef(f"urn:{data['id']}")
             else:
                 subject_uri = URIRef("urn:unknown")
@@ -584,20 +568,20 @@ class YurtleParser:
         """Convert YAML dict to RDF triples."""
         # Map common YAML keys to predicates
         key_mappings = {
-            'type': RDF.type,
-            'title': YURTLE.title,
-            'status': PM.status,
-            'priority': PM.priority,
-            'assignee': PM.assignedTo,
-            'assigned_to': PM.assignedTo,
-            'created': YURTLE.created,
-            'updated': YURTLE.updated,
-            'tags': YURTLE.tag,
-            'labels': YURTLE.label,
-            'methodology': PM.methodology,
-            'domain': BEING.domain,
-            'name': YURTLE.name,
-            'description': YURTLE.description,
+            "type": RDF.type,
+            "title": YURTLE.title,
+            "status": PM.status,
+            "priority": PM.priority,
+            "assignee": PM.assignedTo,
+            "assigned_to": PM.assignedTo,
+            "created": YURTLE.created,
+            "updated": YURTLE.updated,
+            "tags": YURTLE.tag,
+            "labels": YURTLE.label,
+            "methodology": PM.methodology,
+            "domain": BEING.domain,
+            "name": YURTLE.name,
+            "description": YURTLE.description,
         }
 
         for key, value in data.items():
@@ -611,15 +595,16 @@ class YurtleParser:
 
     def _add_triple(self, graph: Graph, subject: URIRef, predicate: URIRef, value: Any):
         """Add a triple with appropriate literal type."""
+        obj: Union[Literal, URIRef]
         if isinstance(value, bool):
             obj = Literal(value, datatype=XSD.boolean)
         elif isinstance(value, int):
             obj = Literal(value, datatype=XSD.integer)
         elif isinstance(value, float):
             obj = Literal(value, datatype=XSD.decimal)
-        elif isinstance(value, str) and value.startswith('urn:'):
+        elif isinstance(value, str) and value.startswith("urn:"):
             obj = URIRef(value)
-        elif isinstance(value, str) and value.startswith('http'):
+        elif isinstance(value, str) and value.startswith("http"):
             obj = URIRef(value)
         else:
             obj = Literal(str(value))
@@ -652,10 +637,10 @@ class YurtleWriter:
 
     def _serialize_turtle(self, graph: Graph) -> str:
         """Serialize graph to Turtle format."""
-        result = graph.serialize(format='turtle')
+        result = graph.serialize(format="turtle")
         # Handle bytes vs string return (depends on rdflib version)
         if isinstance(result, bytes):
-            return result.decode('utf-8')
+            return result.decode("utf-8")
         return result
 
     def write_file(self, doc: YurtleDocument, path: Union[str, Path]):
@@ -663,10 +648,11 @@ class YurtleWriter:
         path = Path(path)
         path.parent.mkdir(parents=True, exist_ok=True)
         text = self.write(doc)
-        path.write_text(text, encoding='utf-8')
+        path.write_text(text, encoding="utf-8")
 
 
 # Convenience functions
+
 
 def parse_yurtle(text: str, source_path: Optional[Path] = None) -> YurtleDocument:
     """Parse a Yurtle document from text."""
@@ -680,7 +666,9 @@ def parse_yurtle_file(path: Union[str, Path]) -> YurtleDocument:
     return parser.parse_file(path)
 
 
-def scan_workspace_graph(workspace_path: Union[str, Path], patterns: Optional[List[str]] = None) -> Graph:
+def scan_workspace_graph(
+    workspace_path: Union[str, Path], patterns: Optional[List[str]] = None
+) -> Graph:
     """
     Scan a workspace and build a unified knowledge graph from all Yurtle files.
 
@@ -693,7 +681,7 @@ def scan_workspace_graph(workspace_path: Union[str, Path], patterns: Optional[Li
     """
     workspace_path = Path(workspace_path)
     if patterns is None:
-        patterns = ['**/*.md']
+        patterns = ["**/*.md"]
 
     parser = YurtleParser()
     unified_graph = Graph()
@@ -707,7 +695,7 @@ def scan_workspace_graph(workspace_path: Union[str, Path], patterns: Optional[Li
 
     for pattern in patterns:
         for path in workspace_path.glob(pattern):
-            if path.is_file() and not path.name.startswith('.'):
+            if path.is_file() and not path.name.startswith("."):
                 try:
                     doc = parser.parse_file(path)
                     if doc.graph:

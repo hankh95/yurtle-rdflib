@@ -105,6 +105,7 @@ __all__ = [
 # Convenience Functions
 # =============================================================================
 
+
 def load_workspace(
     workspace_path: Union[str, Path],
     patterns: Optional[List[str]] = None,
@@ -140,7 +141,7 @@ def load_workspace(
 
     for pattern in patterns:
         for path in workspace.glob(pattern):
-            if path.is_file() and not path.name.startswith('.'):
+            if path.is_file() and not path.name.startswith("."):
                 try:
                     doc = parser.parse_file(path)
 
@@ -255,7 +256,7 @@ def _extract_markdown(file_path: Path) -> str:
         content = file_path.read_text()
 
         # Match frontmatter
-        pattern = re.compile(r'^---\s*\n.*?\n---\s*\n(.*)$', re.DOTALL)
+        pattern = re.compile(r"^---\s*\n.*?\n---\s*\n(.*)$", re.DOTALL)
         match = pattern.match(content)
 
         if match:
@@ -347,6 +348,7 @@ def serialize_file(
 # =============================================================================
 # Plugin Registration Verification
 # =============================================================================
+
 
 def verify_plugins() -> dict:
     """

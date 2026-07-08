@@ -64,6 +64,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class FileState:
     """Tracks the state of a single file in the store."""
+
     path: Path
     hash: str
     last_modified: float
@@ -116,7 +117,7 @@ class YurtleStore(Store):
             patterns: Glob patterns to match (default: ['**/*.md'])
             auto_flush: If True, flush changes immediately after each add/remove
         """
-        super().__init__(configuration, identifier)
+        super().__init__(configuration, identifier)  # type: ignore[arg-type]  # rdflib-7 stubs want Identifier; str config is the documented plugin form
 
         self.root_dir = Path(root_dir)
         self.patterns = patterns or ["**/*.md"]
@@ -169,7 +170,9 @@ class YurtleStore(Store):
                     hash=state_data["hash"],
                     last_modified=state_data["last_modified"],
                     triple_count=state_data["triple_count"],
-                    subject_uri=URIRef(state_data["subject_uri"]) if state_data.get("subject_uri") else None,
+                    subject_uri=(
+                        URIRef(state_data["subject_uri"]) if state_data.get("subject_uri") else None
+                    ),
                     markdown_content=state_data.get("markdown_content", ""),
                 )
 
@@ -250,7 +253,7 @@ class YurtleStore(Store):
         # Scan all matching files
         for pattern in self.patterns:
             for path in self.root_dir.glob(pattern):
-                if path.is_file() and not path.name.startswith('.'):
+                if path.is_file() and not path.name.startswith("."):
                     current_files.add(path)
 
         # Check for new/modified files
@@ -444,6 +447,8 @@ class YurtleStore(Store):
         """
         # Check existing provenance
         for file_uri in self.internal_graph.objects(subject, PROVENANCE.definedIn):
+            if not isinstance(file_uri, URIRef):
+                continue
             path = self._uri_to_path(file_uri)
             if path:
                 return path
@@ -462,7 +467,7 @@ class YurtleStore(Store):
     # RDFlib Store Interface
     # =========================================================================
 
-    def open(self, configuration: str, create: bool = False) -> Optional[int]:
+    def open(self, configuration: str, create: bool = False) -> Optional[int]:  # type: ignore[override]  # rdflib-7 stubs widened to str|tuple; str-only is this store's contract
         """Open the store."""
         self.sync()
         return 1
@@ -583,7 +588,7 @@ class YurtleStore(Store):
         """Check if a triple exists in the store."""
         return triple in self.internal_graph
 
-    def contexts(self, triple: Optional[Tuple[Node, Node, Node]] = None) -> Iterator:
+    def contexts(self, triple: Optional[Tuple[Node, Node, Node]] = None) -> Iterator:  # type: ignore[override]  # rdflib-7 stubs demand Generator[Graph]; Iterator is runtime-compatible
         """Return contexts (empty for single-graph store)."""
         return iter([])
 
@@ -591,7 +596,7 @@ class YurtleStore(Store):
     # Convenience Methods
     # =========================================================================
 
-    def query(self, query_string: str, **kwargs) -> Any:
+    def query(self, query_string: str, **kwargs) -> Any:  # type: ignore[override]  # rdflib-7 stub signature drift; runtime API unchanged
         """
         Execute a SPARQL query against the store.
 
@@ -630,6 +635,7 @@ class YurtleStore(Store):
 # =============================================================================
 # Convenience Functions
 # =============================================================================
+
 
 def create_yurtle_graph(
     root_dir: str,

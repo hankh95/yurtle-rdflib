@@ -24,10 +24,7 @@ class TestLoadWorkspace:
     def test_load_workspace_with_patterns(self, temp_workspace):
         """Test loading with specific patterns."""
         # Only load top-level files
-        graph = yurtle_rdflib.load_workspace(
-            str(temp_workspace),
-            patterns=["*.md"]
-        )
+        graph = yurtle_rdflib.load_workspace(str(temp_workspace), patterns=["*.md"])
 
         # Should have task1 and task2, but not project1 (in subdirectory)
         titles = [str(o) for o in graph.objects(None, YURTLE.title)]
@@ -100,10 +97,7 @@ class TestScanWorkspaceGraph:
     def test_scan_with_patterns(self, temp_workspace):
         """Test scanning with specific patterns."""
         # Only scan top-level
-        graph = yurtle_rdflib.scan_workspace_graph(
-            temp_workspace,
-            patterns=["*.md"]
-        )
+        graph = yurtle_rdflib.scan_workspace_graph(temp_workspace, patterns=["*.md"])
 
         assert len(graph) > 0
 
@@ -127,9 +121,9 @@ class TestNamespaces:
 
         # Check namespaces are bound
         namespaces = dict(graph.namespaces())
-        assert 'yurtle' in namespaces
-        assert 'pm' in namespaces
-        assert 'rdf' in namespaces
+        assert "yurtle" in namespaces
+        assert "pm" in namespaces
+        assert "rdf" in namespaces
 
     def test_namespace_uris(self):
         """Test namespace URIs are correct."""

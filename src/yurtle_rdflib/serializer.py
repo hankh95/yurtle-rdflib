@@ -69,8 +69,8 @@ class YurtleRDFlibSerializer(Serializer):
         self,
         stream: IO[bytes],
         base: Optional[str] = None,
-        encoding: str = "utf-8",
-        **kwargs
+        encoding: Optional[str] = "utf-8",
+        **kwargs,
     ) -> None:
         """
         Serialize the graph to Yurtle format.
@@ -95,10 +95,10 @@ class YurtleRDFlibSerializer(Serializer):
             # Markdown content here...
         """
         # Get markdown content to preserve (if any)
-        markdown_content = kwargs.get('markdown_content', '')
+        markdown_content = kwargs.get("markdown_content", "")
 
         # If preserve_markdown or original_file path provided, read from it
-        preserve_path = kwargs.get('preserve_markdown') or kwargs.get('original_file')
+        preserve_path = kwargs.get("preserve_markdown") or kwargs.get("original_file")
         if preserve_path and not markdown_content:
             markdown_content = self._extract_markdown_from_file(preserve_path)
 
@@ -112,7 +112,7 @@ class YurtleRDFlibSerializer(Serializer):
         output = self._build_yurtle_output(turtle_content, markdown_content)
 
         # Write to stream (always as bytes for RDFlib compatibility)
-        actual_encoding = encoding if encoding else 'utf-8'
+        actual_encoding = encoding if encoding else "utf-8"
         stream.write(output.encode(actual_encoding))
 
     def _filter_provenance_triples(self) -> Graph:
@@ -137,7 +137,7 @@ class YurtleRDFlibSerializer(Serializer):
             if p == PROVENANCE.definedIn:
                 continue
             # Skip file:// URIs in object position (also provenance)
-            if isinstance(o, URIRef) and str(o).startswith('file://'):
+            if isinstance(o, URIRef) and str(o).startswith("file://"):
                 continue
             filtered.add((s, p, o))
 
@@ -155,12 +155,12 @@ class YurtleRDFlibSerializer(Serializer):
         """
         # Bind standard prefixes if not already bound
         prefixes_to_bind = [
-            ('yurtle', YURTLE),
-            ('pm', PM),
-            ('being', BEING),
-            ('rdf', RDF),
-            ('rdfs', RDFS),
-            ('xsd', XSD),
+            ("yurtle", YURTLE),
+            ("pm", PM),
+            ("being", BEING),
+            ("rdf", RDF),
+            ("rdfs", RDFS),
+            ("xsd", XSD),
         ]
 
         for prefix, ns in prefixes_to_bind:
@@ -170,18 +170,14 @@ class YurtleRDFlibSerializer(Serializer):
                 pass  # Prefix already bound
 
         # Serialize to Turtle
-        turtle_bytes = graph.serialize(format='turtle')
+        turtle_bytes = graph.serialize(format="turtle")
 
         # Handle bytes vs string return (depends on rdflib version)
         if isinstance(turtle_bytes, bytes):
-            return turtle_bytes.decode('utf-8')
+            return turtle_bytes.decode("utf-8")
         return turtle_bytes
 
-    def _build_yurtle_output(
-        self,
-        turtle_content: str,
-        markdown_content: str = ""
-    ) -> str:
+    def _build_yurtle_output(self, turtle_content: str, markdown_content: str = "") -> str:
         """
         Build the final Yurtle output with frontmatter and markdown.
 
@@ -200,7 +196,7 @@ class YurtleRDFlibSerializer(Serializer):
 
         if markdown_content:
             # Ensure markdown starts on new line after frontmatter
-            markdown_content = markdown_content.lstrip('\n')
+            markdown_content = markdown_content.lstrip("\n")
             parts.append("")  # Empty line between frontmatter and content
             parts.append(markdown_content)
 
@@ -224,13 +220,10 @@ class YurtleRDFlibSerializer(Serializer):
             return ""
 
         try:
-            content = path.read_text(encoding='utf-8')
+            content = path.read_text(encoding="utf-8")
 
             # Extract content after frontmatter
-            frontmatter_pattern = re.compile(
-                r'^---\s*\n.*?\n---\s*\n(.*)$',
-                re.DOTALL
-            )
+            frontmatter_pattern = re.compile(r"^---\s*\n.*?\n---\s*\n(.*)$", re.DOTALL)
 
             match = frontmatter_pattern.match(content)
             if match:
@@ -245,9 +238,4 @@ class YurtleRDFlibSerializer(Serializer):
 
 
 # Register the serializer plugin with RDFlib
-register(
-    'yurtle',
-    Serializer,
-    'yurtle_rdflib.serializer',
-    'YurtleRDFlibSerializer'
-)
+register("yurtle", Serializer, "yurtle_rdflib.serializer", "YurtleRDFlibSerializer")

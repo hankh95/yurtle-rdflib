@@ -78,14 +78,14 @@ class TestYurtleParser:
 
     def test_get_properties_multiple(self):
         """Test getting multiple values for a property."""
-        text = '''---
+        text = """---
 @prefix yurtle: <https://yurtle.dev/schema/> .
 
 <urn:doc:test> yurtle:tag "tag1", "tag2", "tag3" .
 ---
 
 Content.
-'''
+"""
         parser = YurtleParser()
         doc = parser.parse(text)
 
@@ -128,6 +128,7 @@ class TestYurtleRDFlibParser:
 
         # Check for definedIn triple
         from yurtle_rdflib.namespaces import PROVENANCE
+
         defined_in_triples = list(graph.triples((None, PROVENANCE.definedIn, None)))
         assert len(defined_in_triples) >= 1
 
@@ -141,6 +142,7 @@ class TestYurtleRDFlibParser:
 
         # Should not have definedIn triples
         from yurtle_rdflib.namespaces import PROVENANCE
+
         defined_in_triples = list(graph.triples((None, PROVENANCE.definedIn, None)))
         assert len(defined_in_triples) == 0
 
@@ -195,6 +197,7 @@ class TestFencedBlockParsing:
 
         # Check a triple from the turtle block
         from rdflib.namespace import RDFS
+
         labels = list(doc.graph.objects(predicate=RDFS.label))
         label_strs = [str(label) for label in labels]
         assert "Chunk Graph Storage" in label_strs
@@ -238,12 +241,13 @@ class TestFencedBlockParsing:
         assert len(doc.graph) > 0
 
         from rdflib.namespace import RDFS
+
         labels = list(doc.graph.objects(predicate=RDFS.label))
         assert any("Interesting finding" in str(label) for label in labels)
 
     def test_empty_fenced_block_skipped(self):
         """Empty fenced blocks should be skipped gracefully."""
-        text = '''---
+        text = """---
 id: test
 title: Test
 ---
@@ -254,7 +258,7 @@ title: Test
 ```
 
 Content continues.
-'''
+"""
         parser = YurtleParser()
         doc = parser.parse(text)
         # Should not crash, graph has only frontmatter triples
@@ -262,7 +266,7 @@ Content continues.
 
     def test_malformed_fenced_block_skipped(self):
         """Malformed turtle in fenced blocks should be skipped with warning."""
-        text = '''---
+        text = """---
 id: test
 title: Test
 ---
@@ -275,7 +279,7 @@ This is not valid turtle at all!!!
 ```
 
 Content continues.
-'''
+"""
         parser = YurtleParser()
         doc = parser.parse(text)
         # Should not crash — malformed block skipped
@@ -284,7 +288,8 @@ Content continues.
     def test_malformed_block_logs_debug_with_offset(self, caplog):
         """Malformed block should log at DEBUG including the block offset."""
         import logging
-        text = '''---
+
+        text = """---
 id: test
 title: Test
 ---
@@ -294,7 +299,7 @@ title: Test
 ```turtle
 not valid turtle!!!
 ```
-'''
+"""
         parser = YurtleParser()
         with caplog.at_level(logging.DEBUG, logger="yurtle-parser"):
             doc = parser.parse(text)
@@ -303,11 +308,12 @@ not valid turtle!!!
     def test_crlf_line_endings(self):
         """Fenced blocks with CRLF line endings should be parsed."""
         # Build content with CRLF endings
-        text = "---\r\nid: test\r\ntitle: Test\r\n---\r\n\r\n# Test\r\n\r\n```turtle\r\n@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .\r\n\r\n<#item> rdfs:label \"CRLF test\" .\r\n```\r\n"
+        text = '---\r\nid: test\r\ntitle: Test\r\n---\r\n\r\n# Test\r\n\r\n```turtle\r\n@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .\r\n\r\n<#item> rdfs:label "CRLF test" .\r\n```\r\n'
         parser = YurtleParser()
         doc = parser.parse(text)
 
         from rdflib.namespace import RDFS
+
         labels = [str(label) for label in doc.graph.objects(predicate=RDFS.label)]
         assert "CRLF test" in labels
 
@@ -317,8 +323,8 @@ not valid turtle!!!
         text = (
             "---\nid: test\ntitle: Test\n---\n\n# Test\n\n"
             "```turtle   \n"  # <-- trailing spaces before newline
-            '@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .\n'
-            '\n'
+            "@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .\n"
+            "\n"
             '<#item> rdfs:label "Trailing space test" .\n'
             "```\n"
         )
@@ -326,19 +332,20 @@ not valid turtle!!!
         doc = parser.parse(text)
 
         from rdflib.namespace import RDFS
+
         labels = [str(label) for label in doc.graph.objects(predicate=RDFS.label)]
         assert "Trailing space test" in labels
 
     def test_turtle_frontmatter_with_fenced_blocks(self, sample_turtle_doc):
         """Turtle frontmatter + fenced blocks should both parse into graph."""
         # Append a fenced block to the turtle-frontmatter doc
-        text = sample_turtle_doc + '''
+        text = sample_turtle_doc + """
 ```turtle
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
 
 <#extra> rdfs:label "Extra from block" .
 ```
-'''
+"""
         parser = YurtleParser()
         doc = parser.parse(text)
 
@@ -347,6 +354,7 @@ not valid turtle!!!
         assert doc.subject_uri == URIRef("urn:task:T-001")
         # Fenced block triples
         from rdflib.namespace import RDFS
+
         labels = [str(label) for label in doc.graph.objects(predicate=RDFS.label)]
         assert "Extra from block" in labels
 
@@ -406,16 +414,16 @@ not valid turtle!!!
         # Document the known duplication: fenced block triples appear in both
         # the serialized frontmatter AND the body's fenced blocks.
         # Consumers doing round-trip editing should be aware of this.
-        assert len(doc2.graph) >= original_count, (
-            "Re-parsed graph should have at least as many triples as original"
-        )
+        assert (
+            len(doc2.graph) >= original_count
+        ), "Re-parsed graph should have at least as many triples as original"
 
     def test_info_string_after_language_tag_not_matched(self):
         """CommonMark info strings (e.g. ```turtle linenos) are intentionally
         not matched. Only bare ```turtle or ```yurtle (with optional whitespace)
         are recognized. This is by design — info strings are uncommon in
         knowledge blocks and supporting them would complicate the regex."""
-        text = '''---
+        text = """---
 id: test
 title: Test
 ---
@@ -427,11 +435,12 @@ title: Test
 
 <#item> rdfs:label "Should not parse" .
 ```
-'''
+"""
         parser = YurtleParser()
         doc = parser.parse(text)
 
         from rdflib.namespace import RDFS
+
         labels = [str(label) for label in doc.graph.objects(predicate=RDFS.label)]
         assert "Should not parse" not in labels
 
@@ -449,7 +458,7 @@ title: Test
 
     def test_prefix_inheritance_from_standard(self):
         """Fenced blocks should inherit standard prefixes without redeclaring."""
-        text = '''---
+        text = """---
 id: test
 title: Test
 ---
@@ -459,17 +468,18 @@ title: Test
 ```turtle
 <#item> rdfs:label "Inherited prefix" .
 ```
-'''
+"""
         parser = YurtleParser()
         doc = parser.parse(text)
 
         from rdflib.namespace import RDFS
+
         labels = [str(label) for label in doc.graph.objects(predicate=RDFS.label)]
         assert "Inherited prefix" in labels
 
     def test_prefix_inheritance_from_frontmatter(self):
         """Fenced blocks should inherit prefixes declared in Turtle frontmatter."""
-        text = '''---
+        text = """---
 @prefix yurtle: <https://yurtle.dev/schema/> .
 @prefix custom: <https://example.org/custom/> .
 
@@ -482,7 +492,7 @@ title: Test
 ```turtle
 <#item> custom:property "Frontmatter prefix" .
 ```
-'''
+"""
         parser = YurtleParser()
         doc = parser.parse(text)
 
@@ -492,7 +502,7 @@ title: Test
 
     def test_block_prefix_overrides_injected(self):
         """Block's own @prefix should override injected declarations."""
-        text = '''---
+        text = """---
 @prefix yurtle: <https://yurtle.dev/schema/> .
 @prefix custom: <https://example.org/custom/> .
 
@@ -506,7 +516,7 @@ title: Test
 
 <#item> custom:property "Override test" .
 ```
-'''
+"""
         parser = YurtleParser()
         doc = parser.parse(text)
 
@@ -517,7 +527,7 @@ title: Test
 
     def test_yaml_in_yurtle_block_skipped(self):
         """YAML content in a ```yurtle block should be silently skipped."""
-        text = '''---
+        text = """---
 id: test
 title: Test
 ---
@@ -531,7 +541,7 @@ being:
 ```
 
 Content continues.
-'''
+"""
         parser = YurtleParser()
         doc = parser.parse(text)
         # Should not crash, only frontmatter triples
@@ -541,7 +551,7 @@ Content continues.
 
     def test_yaml_in_turtle_block_skipped(self):
         """YAML content in a ```turtle block should be silently skipped."""
-        text = '''---
+        text = """---
 id: test
 title: Test
 ---
@@ -554,14 +564,14 @@ corpus:
   - name: core-docs
     path: /data/corpus
 ```
-'''
+"""
         parser = YurtleParser()
         doc = parser.parse(text)
         assert doc.frontmatter_type == "yaml"
 
     def test_yaml_with_document_start_in_block_skipped(self):
         """YAML with --- document start marker in fenced block should be skipped."""
-        text = '''---
+        text = """---
 id: test
 title: Test
 ---
@@ -576,14 +586,14 @@ last_updated: 2026-02-14
 y1_concepts: 847
 ---
 ```
-'''
+"""
         parser = YurtleParser()
         doc = parser.parse(text)
         assert doc.frontmatter_type == "yaml"
 
     def test_merge_conflict_in_block_skipped(self):
         """Fenced blocks with git merge conflict markers should be skipped."""
-        text = '''---
+        text = """---
 id: test
 title: Test
 ---
@@ -599,7 +609,7 @@ title: Test
 =======
 >>>>>>> 8a6d7c07
 ```
-'''
+"""
         parser = YurtleParser()
         doc = parser.parse(text)
         # Should not crash — conflict block skipped
@@ -608,29 +618,25 @@ title: Test
     def test_yaml_detection_does_not_flag_turtle(self):
         """Valid Turtle content should NOT be detected as YAML."""
         # These patterns look vaguely YAML-ish but are valid Turtle
+        assert not YurtleParser._looks_like_yaml('<#item> rdfs:label "Test" .')
         assert not YurtleParser._looks_like_yaml(
+            "@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .\n"
             '<#item> rdfs:label "Test" .'
         )
-        assert not YurtleParser._looks_like_yaml(
-            '@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .\n'
-            '<#item> rdfs:label "Test" .'
-        )
-        assert not YurtleParser._looks_like_yaml(
-            '# A comment line\n'
-            '<#item> rdfs:label "Test" .'
-        )
+        assert not YurtleParser._looks_like_yaml("# A comment line\n" '<#item> rdfs:label "Test" .')
 
     def test_yaml_detection_catches_yaml(self):
         """YAML-like content should be correctly detected."""
-        assert YurtleParser._looks_like_yaml('being:\n  id: foo')
-        assert YurtleParser._looks_like_yaml('corpus:\n  - name: x')
-        assert YurtleParser._looks_like_yaml('# comment\n---\nkey: val')
-        assert YurtleParser._looks_like_yaml('scenarios:\n  - id: s1')
+        assert YurtleParser._looks_like_yaml("being:\n  id: foo")
+        assert YurtleParser._looks_like_yaml("corpus:\n  - name: x")
+        assert YurtleParser._looks_like_yaml("# comment\n---\nkey: val")
+        assert YurtleParser._looks_like_yaml("scenarios:\n  - id: s1")
 
     def test_malformed_block_logs_debug_not_warning(self, caplog):
         """Unparseable fenced blocks should log at DEBUG, not WARNING."""
         import logging
-        text = '''---
+
+        text = """---
 id: test
 title: Test
 ---
@@ -640,7 +646,7 @@ title: Test
 ```turtle
 <> a unknown:Type .
 ```
-'''
+"""
         parser = YurtleParser()
         with caplog.at_level(logging.DEBUG, logger="yurtle-parser"):
             doc = parser.parse(text)
