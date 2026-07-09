@@ -2,13 +2,10 @@
 Tests for the YurtleStore.
 """
 
-import pytest
-from pathlib import Path
-from rdflib import Graph, URIRef, Literal
+from rdflib import Graph, Literal, URIRef
 
 import yurtle_rdflib
-from yurtle_rdflib import YurtleStore, YURTLE, PM
-from yurtle_rdflib.namespaces import PROVENANCE
+from yurtle_rdflib import YURTLE, YurtleStore
 
 
 class TestYurtleStoreInit:
@@ -54,12 +51,12 @@ class TestYurtleStoreSync:
         initial_count = len(store.file_states)
 
         # Add new file
-        (temp_workspace / "new.md").write_text('''---
+        (temp_workspace / "new.md").write_text("""---
 @prefix yurtle: <https://yurtle.dev/schema/> .
 <urn:task:new> yurtle:title "New" .
 ---
 # New
-''')
+""")
 
         synced = store.sync()
 

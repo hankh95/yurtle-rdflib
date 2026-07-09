@@ -3,11 +3,7 @@ Shared pytest fixtures for yurtle-rdflib tests.
 """
 
 import pytest
-from pathlib import Path
-import tempfile
-import shutil
-
-from rdflib import Graph, URIRef, Literal, Namespace
+from rdflib import Graph, Literal, URIRef
 
 # Import the package to register plugins
 import yurtle_rdflib
@@ -28,7 +24,7 @@ def pm_ns():
 @pytest.fixture
 def sample_turtle_doc():
     """Sample Yurtle document with Turtle frontmatter."""
-    return '''---
+    return """---
 @prefix yurtle: <https://yurtle.dev/schema/> .
 @prefix pm: <https://yurtle.dev/pm/> .
 
@@ -45,13 +41,13 @@ This is a test task for unit testing.
 ## Description
 
 A simple task used in tests.
-'''
+"""
 
 
 @pytest.fixture
 def sample_yaml_doc():
     """Sample Yurtle document with YAML frontmatter."""
-    return '''---
+    return """---
 id: T-002
 title: YAML Task
 status: in-progress
@@ -64,18 +60,18 @@ tags:
 # T-002: YAML Task
 
 This task uses YAML frontmatter.
-'''
+"""
 
 
 @pytest.fixture
 def sample_no_frontmatter():
     """Sample document with no frontmatter."""
-    return '''# Plain Document
+    return """# Plain Document
 
 This document has no frontmatter.
 
 Just plain markdown content.
-'''
+"""
 
 
 @pytest.fixture
@@ -85,7 +81,7 @@ def temp_workspace(tmp_path):
     workspace.mkdir()
 
     # Create sample files
-    (workspace / "task1.md").write_text('''---
+    (workspace / "task1.md").write_text("""---
 @prefix yurtle: <https://yurtle.dev/schema/> .
 @prefix pm: <https://yurtle.dev/pm/> .
 
@@ -97,9 +93,9 @@ def temp_workspace(tmp_path):
 # Task One
 
 First task.
-''')
+""")
 
-    (workspace / "task2.md").write_text('''---
+    (workspace / "task2.md").write_text("""---
 @prefix yurtle: <https://yurtle.dev/schema/> .
 @prefix pm: <https://yurtle.dev/pm/> .
 
@@ -111,12 +107,12 @@ First task.
 # Task Two
 
 Second task.
-''')
+""")
 
     # Create subdirectory with files
     subdir = workspace / "projects"
     subdir.mkdir()
-    (subdir / "project1.md").write_text('''---
+    (subdir / "project1.md").write_text("""---
 id: project1
 title: Project One
 type: project
@@ -125,7 +121,7 @@ type: project
 # Project One
 
 A project file.
-''')
+""")
 
     return workspace
 
@@ -133,7 +129,7 @@ A project file.
 @pytest.fixture
 def sample_doc_with_fenced_blocks():
     """Sample Yurtle document with YAML frontmatter and fenced turtle blocks."""
-    return '''---
+    return """---
 id: EXP-981
 title: "Y0/Y1 Chunk Graph Storage"
 type: expedition
@@ -168,13 +164,13 @@ The feature was implemented successfully.
     kb:by "DGX" ;
   ] .
 ```
-'''
+"""
 
 
 @pytest.fixture
 def sample_doc_with_hdd_block():
     """Sample HDD hypothesis file with turtle knowledge block."""
-    return '''---
+    return """---
 id: H130.1
 title: "V12 accuracy improves"
 type: hypothesis
@@ -202,13 +198,13 @@ tags: [paper-130]
 ## Rationale
 
 We hypothesize that V12's cognitive signal fusion improves accuracy.
-'''
+"""
 
 
 @pytest.fixture
 def sample_doc_no_frontmatter_with_block():
     """Document with no frontmatter but a fenced turtle block."""
-    return '''# Standalone Notes
+    return """# Standalone Notes
 
 Some notes with an inline knowledge block.
 
@@ -219,7 +215,7 @@ Some notes with an inline knowledge block.
 <#observation-1> a note:Observation ;
     rdfs:label "Interesting finding" .
 ```
-'''
+"""
 
 
 @pytest.fixture

@@ -2,12 +2,10 @@
 Tests for the Yurtle serializer.
 """
 
-import pytest
-from pathlib import Path
-from rdflib import Graph, URIRef, Literal
+from rdflib import Graph, Literal, URIRef
 
 import yurtle_rdflib
-from yurtle_rdflib import YurtleWriter, YurtleDocument, YURTLE, PM
+from yurtle_rdflib import YURTLE, YurtleDocument, YurtleWriter
 
 
 class TestYurtleWriter:
@@ -87,11 +85,7 @@ class TestYurtleRDFlibSerializer:
         output_path = tmp_path / "output.md"
         markdown = "# My Document\n\nThis is the content."
 
-        sample_graph.serialize(
-            str(output_path),
-            format="yurtle",
-            markdown_content=markdown
-        )
+        sample_graph.serialize(str(output_path), format="yurtle", markdown_content=markdown)
 
         content = output_path.read_text()
         assert "# My Document" in content
@@ -166,11 +160,7 @@ class TestRoundTrip:
         graph.parse(str(input_path), format="yurtle")
 
         output_path = tmp_path / "output.md"
-        graph.serialize(
-            str(output_path),
-            format="yurtle",
-            markdown_content=original_content
-        )
+        graph.serialize(str(output_path), format="yurtle", markdown_content=original_content)
 
         # Parse again
         doc2 = parser.parse_file(output_path)
@@ -186,9 +176,7 @@ class TestConvenienceFunctions:
         output_path = tmp_path / "output.md"
 
         yurtle_rdflib.serialize_file(
-            sample_graph,
-            output_path,
-            markdown_content="# Test\n\nContent."
+            sample_graph, output_path, markdown_content="# Test\n\nContent."
         )
 
         assert output_path.exists()

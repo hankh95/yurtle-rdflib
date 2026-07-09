@@ -30,12 +30,12 @@ PROVENANCE = Namespace("https://yurtle.dev/provenance/")
 
 # All namespaces as a dict for easy binding
 STANDARD_NAMESPACES = {
-    'yurtle': YURTLE,
-    'pm': PM,
-    'being': BEING,
-    'voyage': VOYAGE,
-    'knowledge': KNOWLEDGE,
-    'prov': PROVENANCE,
+    "yurtle": YURTLE,
+    "pm": PM,
+    "being": BEING,
+    "voyage": VOYAGE,
+    "knowledge": KNOWLEDGE,
+    "prov": PROVENANCE,
 }
 
 
@@ -52,6 +52,6 @@ def bind_standard_namespaces(graph):
         graph.bind(prefix, ns)
 
     # Also bind standard RDF namespaces
-    graph.bind('rdf', RDF)
-    graph.bind('rdfs', RDFS)
-    graph.bind('xsd', XSD)
+    graph.bind("rdf", RDF)
+    graph.bind("rdfs", RDFS)
+    graph.bind("xsd", XSD)

@@ -23,11 +23,9 @@ License: MIT
 """
 
 import logging
-from io import BytesIO, StringIO
 from pathlib import Path
-from typing import IO, Optional, Union
 
-from rdflib import Graph, URIRef, Namespace
+from rdflib import Graph, Namespace, URIRef
 from rdflib.parser import Parser
 from rdflib.plugin import register
 
@@ -63,12 +61,7 @@ class YurtleRDFlibParser(Parser):
         self._core_parser = CoreYurtleParser()
 
     def parse(
-        self,
-        source,
-        sink: Graph,
-        format: Optional[str] = None,
-        encoding: str = "utf-8",
-        **kwargs
+        self, source, sink: Graph, format: str | None = None, encoding: str = "utf-8", **kwargs
     ) -> None:
         """
         Parse a Yurtle document into an RDFlib graph.
@@ -86,7 +79,7 @@ class YurtleRDFlibParser(Parser):
         - A file-like object (BytesIO, StringIO)
         - An InputSource with a stream
         """
-        add_provenance = kwargs.get('provenance', True)
+        add_provenance = kwargs.get("provenance", True)
 
         # Extract content from source
         content = self._get_content(source, encoding)
@@ -114,25 +107,25 @@ class YurtleRDFlibParser(Parser):
     def _get_content(self, source, encoding: str) -> str:
         """Extract text content from various source types."""
         # Try to get the input stream
-        if hasattr(source, 'getByteStream'):
+        if hasattr(source, "getByteStream"):
             stream = source.getByteStream()
             if stream:
                 content = stream.read()
                 if isinstance(content, bytes):
                     return content.decode(encoding)
-                return content
+                return str(content)
 
-        if hasattr(source, 'getCharacterStream'):
+        if hasattr(source, "getCharacterStream"):
             stream = source.getCharacterStream()
             if stream:
-                return stream.read()
+                return str(stream.read())
 
         # Try to get system ID (file path)
-        if hasattr(source, 'getSystemId'):
+        if hasattr(source, "getSystemId"):
             system_id = source.getSystemId()
             if system_id:
                 # Handle file:// URIs
-                if system_id.startswith('file://'):
+                if system_id.startswith("file://"):
                     system_id = system_id[7:]
                 path = Path(system_id)
                 if path.exists():
@@ -146,13 +139,13 @@ class YurtleRDFlibParser(Parser):
 
         raise ValueError(f"Cannot extract content from source: {type(source)}")
 
-    def _get_source_path(self, source) -> Optional[Path]:
+    def _get_source_path(self, source) -> Path | None:
         """Extract file path from source if available."""
         # Try system ID
-        if hasattr(source, 'getSystemId'):
+        if hasattr(source, "getSystemId"):
             system_id = source.getSystemId()
             if system_id:
-                if system_id.startswith('file://'):
+                if system_id.startswith("file://"):
                     system_id = system_id[7:]
                 return Path(system_id)
 
@@ -164,9 +157,4 @@ class YurtleRDFlibParser(Parser):
 
 
 # Register the parser plugin with RDFlib
-register(
-    'yurtle',
-    Parser,
-    'yurtle_rdflib.parser',
-    'YurtleRDFlibParser'
-)
+register("yurtle", Parser, "yurtle_rdflib.parser", "YurtleRDFlibParser")

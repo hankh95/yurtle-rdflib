@@ -37,24 +37,23 @@ License: MIT
 import hashlib
 import json
 import logging
-import re
-from pathlib import Path
-from typing import Dict, Optional, Any, Iterator, Tuple, Generator, Set, List
+from collections.abc import Generator, Iterator
 from dataclasses import dataclass
 from datetime import datetime
+from pathlib import Path
+from typing import Any
 
-from rdflib import Graph, URIRef, Literal, BNode, Namespace
+from rdflib import Graph, URIRef
 from rdflib.store import Store
 from rdflib.term import Node
-from rdflib.namespace import RDF, RDFS, XSD
 
 from .core import (
+    BEING,
+    PM,
+    YURTLE,
+    YurtleDocument,
     YurtleParser,
     YurtleWriter,
-    YurtleDocument,
-    YURTLE,
-    PM,
-    BEING,
 )
 from .namespaces import PROVENANCE
 
@@ -64,11 +63,12 @@ logger = logging.getLogger(__name__)
 @dataclass
 class FileState:
     """Tracks the state of a single file in the store."""
+
     path: Path
     hash: str
     last_modified: float
     triple_count: int
-    subject_uri: Optional[URIRef] = None
+    subject_uri: URIRef | None = None
     is_dirty: bool = False
     markdown_content: str = ""  # Preserved for round-trip
 
@@ -101,9 +101,9 @@ class YurtleStore(Store):
     def __init__(
         self,
         root_dir: str,
-        configuration: Optional[str] = None,
-        identifier: Optional[str] = None,
-        patterns: Optional[List[str]] = None,
+        configuration: str | None = None,
+        identifier: str | None = None,
+        patterns: list[str] | None = None,
         auto_flush: bool = False,
     ):
         """
@@ -116,7 +116,7 @@ class YurtleStore(Store):
             patterns: Glob patterns to match (default: ['**/*.md'])
             auto_flush: If True, flush changes immediately after each add/remove
         """
-        super().__init__(configuration, identifier)
+        super().__init__(configuration, identifier)  # type: ignore[arg-type]  # rdflib-7 stubs want Identifier; str config is the documented plugin form
 
         self.root_dir = Path(root_dir)
         self.patterns = patterns or ["**/*.md"]
@@ -124,10 +124,10 @@ class YurtleStore(Store):
 
         # Internal state
         self.internal_graph = Graph()
-        self.file_states: Dict[Path, FileState] = {}
+        self.file_states: dict[Path, FileState] = {}
         self.parser = YurtleParser()
         self.writer = YurtleWriter()
-        self._dirty_files: Set[Path] = set()
+        self._dirty_files: set[Path] = set()
 
         # Bind common namespaces
         self.internal_graph.bind("prov", PROVENANCE)
@@ -169,7 +169,9 @@ class YurtleStore(Store):
                     hash=state_data["hash"],
                     last_modified=state_data["last_modified"],
                     triple_count=state_data["triple_count"],
-                    subject_uri=URIRef(state_data["subject_uri"]) if state_data.get("subject_uri") else None,
+                    subject_uri=(
+                        URIRef(state_data["subject_uri"]) if state_data.get("subject_uri") else None
+                    ),
                     markdown_content=state_data.get("markdown_content", ""),
                 )
 
@@ -223,7 +225,7 @@ class YurtleStore(Store):
         """Convert a file path to a file:// URI."""
         return URIRef(f"file://{path.resolve()}")
 
-    def _uri_to_path(self, uri: URIRef) -> Optional[Path]:
+    def _uri_to_path(self, uri: URIRef) -> Path | None:
         """Convert a file:// URI back to a Path."""
         uri_str = str(uri)
         if uri_str.startswith("file://"):
@@ -245,12 +247,12 @@ class YurtleStore(Store):
             Number of files that were re-synced
         """
         synced_count = 0
-        current_files: Set[Path] = set()
+        current_files: set[Path] = set()
 
         # Scan all matching files
         for pattern in self.patterns:
             for path in self.root_dir.glob(pattern):
-                if path.is_file() and not path.name.startswith('.'):
+                if path.is_file() and not path.name.startswith("."):
                     current_files.add(path)
 
         # Check for new/modified files
@@ -429,7 +431,7 @@ class YurtleStore(Store):
 
         logger.debug(f"Flushed {path}: {state.triple_count} triples")
 
-    def _resolve_file_for_subject(self, subject: URIRef) -> Optional[Path]:
+    def _resolve_file_for_subject(self, subject: URIRef) -> Path | None:
         """
         Resolve which file a subject should be stored in.
 
@@ -444,6 +446,8 @@ class YurtleStore(Store):
         """
         # Check existing provenance
         for file_uri in self.internal_graph.objects(subject, PROVENANCE.definedIn):
+            if not isinstance(file_uri, URIRef):
+                continue
             path = self._uri_to_path(file_uri)
             if path:
                 return path
@@ -462,7 +466,7 @@ class YurtleStore(Store):
     # RDFlib Store Interface
     # =========================================================================
 
-    def open(self, configuration: str, create: bool = False) -> Optional[int]:
+    def open(self, configuration: str, create: bool = False) -> int | None:  # type: ignore[override]  # rdflib-7 stubs widened to str|tuple; str-only is this store's contract
         """Open the store."""
         self.sync()
         return 1
@@ -483,7 +487,7 @@ class YurtleStore(Store):
 
     def add(
         self,
-        triple: Tuple[Node, Node, Node],
+        triple: tuple[Node, Node, Node],
         context: Any = None,
         quoted: bool = False,
     ) -> None:
@@ -529,7 +533,7 @@ class YurtleStore(Store):
 
     def remove(
         self,
-        triple: Tuple[Optional[Node], Optional[Node], Optional[Node]],
+        triple: tuple[Node | None, Node | None, Node | None],
         context: Any = None,
     ) -> None:
         """
@@ -558,9 +562,9 @@ class YurtleStore(Store):
 
     def triples(
         self,
-        triple_pattern: Tuple[Optional[Node], Optional[Node], Optional[Node]],
+        triple_pattern: tuple[Node | None, Node | None, Node | None],
         context: Any = None,
-    ) -> Generator[Tuple[Tuple[Node, Node, Node], Any], None, None]:
+    ) -> Generator[tuple[tuple[Node, Node, Node], Any], None, None]:
         """
         Yield all triples matching the pattern.
 
@@ -579,11 +583,11 @@ class YurtleStore(Store):
         """Return the number of triples in the store."""
         return len(self.internal_graph)
 
-    def __contains__(self, triple: Tuple[Node, Node, Node]) -> bool:
+    def __contains__(self, triple: tuple[Node, Node, Node]) -> bool:
         """Check if a triple exists in the store."""
         return triple in self.internal_graph
 
-    def contexts(self, triple: Optional[Tuple[Node, Node, Node]] = None) -> Iterator:
+    def contexts(self, triple: tuple[Node, Node, Node] | None = None) -> Iterator:  # type: ignore[override]  # rdflib-7 stubs demand Generator[Graph]; Iterator is runtime-compatible
         """Return contexts (empty for single-graph store)."""
         return iter([])
 
@@ -591,7 +595,7 @@ class YurtleStore(Store):
     # Convenience Methods
     # =========================================================================
 
-    def query(self, query_string: str, **kwargs) -> Any:
+    def query(self, query_string: str, **kwargs) -> Any:  # type: ignore[override]  # rdflib-7 stub signature drift; runtime API unchanged
         """
         Execute a SPARQL query against the store.
 
@@ -607,15 +611,15 @@ class YurtleStore(Store):
         self.sync()
         return self.internal_graph.query(query_string, **kwargs)
 
-    def get_file_for_subject(self, subject_uri: URIRef) -> Optional[Path]:
+    def get_file_for_subject(self, subject_uri: URIRef) -> Path | None:
         """Get the source file for a subject URI."""
         return self._resolve_file_for_subject(subject_uri)
 
-    def get_dirty_files(self) -> Set[Path]:
+    def get_dirty_files(self) -> set[Path]:
         """Get the set of files pending flush."""
         return self._dirty_files.copy()
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get statistics about the store."""
         return {
             "root_dir": str(self.root_dir),
@@ -631,9 +635,10 @@ class YurtleStore(Store):
 # Convenience Functions
 # =============================================================================
 
+
 def create_yurtle_graph(
     root_dir: str,
-    patterns: Optional[List[str]] = None,
+    patterns: list[str] | None = None,
     auto_flush: bool = False,
 ) -> Graph:
     """
