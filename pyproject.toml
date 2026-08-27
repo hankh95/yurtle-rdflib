@@ -8,7 +8,7 @@ version = "0.3.0"
 description = "RDFlib plugin for Yurtle format (Markdown with Turtle/YAML frontmatter)"
 readme = "README.md"
 license = "MIT"
-authors = [{ name = "Hank Huang", email = "hank@nusy.ai" }]
+authors = [{ name = "Hank Head", email = "hankh1844@gmail.com" }]
 requires-python = ">=3.10"
 dependencies = ["rdflib>=6.0.0", "pyyaml>=6.0"]
 keywords = ["rdf", "rdflib", "yurtle", "markdown", "turtle", "knowledge-graph", "semantic-web"]
